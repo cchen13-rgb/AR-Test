@@ -1,64 +1,848 @@
 <!DOCTYPE html>
-<html>
-  <head>
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <script src="https://aframe.io/releases/1.5.0/aframe.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/mind-ar@1.2.5/dist/mindar-image-aframe.prod.js"></script>
-  </head>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>AR Quest</title>
+<link href="https://fonts.googleapis.com/css2?family=IM+Fell+English:ital@0;1&family=Cinzel:wght@400;600&display=swap" rel="stylesheet">
+<style>
+/* ─── Reset ─────────────────────────────────────────── */
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
-  <body style="margin:0; overflow:hidden;">
+:root {
+  --parchment:   #e8e0d0;
+  --parchment2:  #d4c8b0;
+  --diamond-a:   #9e9ab8;
+  --diamond-b:   #b8b4cc;
+  --border:      #1a1a2e;
+  --scroll-bg:   #c8b898;
+  --scroll-edge: #a09070;
+  --text-dark:   #1a1520;
+  --text-mid:    #3a3050;
+  --gold:        #c8a84b;
+  --capture-bg:  rgba(200,168,75,0.15);
+}
 
-    <button id="startBtn" style="position:fixed; z-index:999; top:20px; left:20px;">
-      Start AR
-    </button>
+body {
+  background: #0a0008;
+  overflow: hidden;
+  height: 100dvh;
+  width: 100vw;
+  font-family: 'IM Fell English', serif;
+  user-select: none;
+}
 
-    <a-scene
-      mindar-image="
-        imageTargetSrc: ./targets.mind;
-        autoStart: false;
-        uiLoading: no;
-        uiError: no;
-        uiScanning: no;
-        filterMinCF: 0.001;
-        filterBeta: 0.01;
-        warmupTolerance: 5;
-        missTolerance: 5;
-      "
-      embedded
-      color-space="sRGB"
-      renderer="colorManagement: true"
-      vr-mode-ui="enabled: false"
-      device-orientation-permission-ui="enabled: false"
-    >
-      <a-camera position="0 0 0" look-controls="enabled: false"></a-camera>
+/* ─── Camera Layer ───────────────────────────────────── */
+#camera-layer {
+  position: fixed;
+  inset: 0;
+}
 
-      <a-entity mindar-image-target="targetIndex: 0">
-        <a-box position="0 0 0" material="color: red;"></a-box>
-      </a-entity>
-    </a-scene>
+video {
+  position: absolute;
+  inset: 0;
+  width: 100%; height: 100%;
+  object-fit: cover;
+}
 
-    <script>
-      document.querySelector("#startBtn").addEventListener("click", async () => {
-        const scene = document.querySelector("a-scene");
+canvas#detect-canvas {
+  position: absolute;
+  inset: 0;
+  width: 100%; height: 100%;
+}
 
-        // Wait for scene to be ready before accessing systems
-        const start = async () => {
-          const arSystem = scene.systems["mindar-image-system"];
-          if (!arSystem) {
-            console.error("MindAR system not found");
-            return;
-          }
-          await arSystem.start();
-          document.querySelector("#startBtn").style.display = "none";
-        };
+/* ─── Quest HUD (top) ────────────────────────────────── */
+#quest-hud {
+  position: fixed;
+  top: 0; left: 0; right: 0;
+  padding: 14px 20px;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  background: linear-gradient(to bottom, rgba(10,0,8,0.75) 60%, transparent);
+  z-index: 30;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.5s;
+}
 
-        if (scene.hasLoaded) {
-          start();
-        } else {
-          scene.addEventListener("loaded", start);
-        }
-      });
-    </script>
+#quest-hud.visible { opacity: 1; }
 
-  </body>
+#quest-icon {
+  font-size: 22px;
+  filter: drop-shadow(0 0 6px var(--gold));
+}
+
+#quest-text {
+  font-family: 'Cinzel', serif;
+  font-size: 11px;
+  letter-spacing: 2px;
+  color: var(--gold);
+  text-shadow: 0 0 12px rgba(200,168,75,0.5);
+}
+
+#quest-text span {
+  display: block;
+  font-size: 9px;
+  letter-spacing: 1px;
+  color: rgba(200,168,75,0.55);
+  margin-top: 2px;
+  font-family: 'IM Fell English', serif;
+  font-style: italic;
+}
+
+/* ─── Capture Timer Ring ─────────────────────────────── */
+#capture-wrap {
+  position: fixed;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 25;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.3s;
+}
+
+#capture-wrap.active { opacity: 1; }
+
+#capture-ring {
+  position: relative;
+  width: 100px; height: 100px;
+}
+
+#capture-ring svg {
+  transform: rotate(-90deg);
+  width: 100%; height: 100%;
+}
+
+#capture-ring circle.track {
+  fill: none;
+  stroke: rgba(200,168,75,0.2);
+  stroke-width: 3;
+}
+
+#capture-ring circle.fill {
+  fill: none;
+  stroke: var(--gold);
+  stroke-width: 3;
+  stroke-dasharray: 283;
+  stroke-dashoffset: 283;
+  transition: stroke-dashoffset 0.1s linear;
+  filter: drop-shadow(0 0 6px var(--gold));
+}
+
+#capture-label {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  font-family: 'Cinzel', serif;
+  font-size: 9px;
+  letter-spacing: 2px;
+  color: var(--gold);
+  text-shadow: 0 0 8px var(--gold);
+}
+
+#capture-label .obj-name {
+  font-size: 11px;
+  font-style: italic;
+  font-family: 'IM Fell English', serif;
+  margin-top: 2px;
+}
+
+/* ─── Dialogue Box ───────────────────────────────────── */
+#dialogue-wrap {
+  position: fixed;
+  bottom: 0; left: 0; right: 0;
+  z-index: 40;
+  padding: 0 16px 20px;
+  transform: translateY(120%);
+  transition: transform 0.45s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+#dialogue-wrap.open { transform: translateY(0); }
+
+#dialogue-box {
+  position: relative;
+  border-radius: 14px;
+  border: 2.5px solid var(--border);
+  overflow: visible;
+  /* Harlequin diamond background */
+  background-color: var(--diamond-b);
+  background-image:
+    linear-gradient(135deg, var(--diamond-a) 25%, transparent 25%),
+    linear-gradient(225deg, var(--diamond-a) 25%, transparent 25%),
+    linear-gradient(315deg, var(--diamond-a) 25%, transparent 25%),
+    linear-gradient(45deg,  var(--diamond-a) 25%, transparent 25%);
+  background-size: 28px 28px;
+  background-position: 0 0, 0 14px, 14px -14px, -14px 0;
+  box-shadow:
+    0 -4px 32px rgba(0,0,0,0.5),
+    inset 0 0 0 1px rgba(255,255,255,0.08);
+  min-height: 130px;
+  padding: 20px 20px 20px 130px;
+}
+
+/* Gradient wash left→right so text area is readable */
+#dialogue-box::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: 12px;
+  background: linear-gradient(
+    to right,
+    rgba(180,170,200,0.35) 0%,
+    rgba(200,195,215,0.55) 40%,
+    rgba(210,205,225,0.65) 100%
+  );
+  pointer-events: none;
+}
+
+/* ── Scroll tab (top-left) ───── */
+#scroll-tab {
+  position: absolute;
+  top: -18px; left: 24px;
+  width: 160px; height: 34px;
+  background: linear-gradient(to bottom, var(--parchment), var(--scroll-bg));
+  border: 2px solid var(--border);
+  border-radius: 6px 6px 0 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  z-index: 2;
+}
+
+#scroll-tab::before {
+  content: '✾ ✦ ✾';
+  font-size: 10px;
+  color: var(--scroll-edge);
+  letter-spacing: 4px;
+  opacity: 0.7;
+}
+
+/* ── Corner ornaments ─────── */
+.ornament {
+  position: absolute;
+  font-size: 22px;
+  line-height: 1;
+  color: var(--border);
+  z-index: 3;
+  pointer-events: none;
+}
+.ornament.tr { top: -6px; right: -4px; transform: scaleX(-1); }
+.ornament.bl { bottom: -6px; left: -4px; transform: scaleY(-1); }
+
+/* ── Profile portrait ─────── */
+#portrait-wrap {
+  position: absolute;
+  left: 16px;
+  bottom: 10px;
+  width: 100px;
+  z-index: 5;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+}
+
+#portrait-img {
+  width: 90px;
+  height: 90px;
+  border-radius: 50%;
+  object-fit: cover;
+  border: 3px solid var(--border);
+  box-shadow:
+    0 0 0 2px var(--diamond-a),
+    0 4px 16px rgba(0,0,0,0.5);
+}
+
+#portrait-name {
+  font-family: 'Cinzel', serif;
+  font-size: 9px;
+  letter-spacing: 1.5px;
+  color: var(--text-dark);
+  text-align: center;
+  background: rgba(200,184,152,0.7);
+  padding: 2px 8px;
+  border: 1px solid rgba(26,26,46,0.25);
+  border-radius: 3px;
+  white-space: nowrap;
+}
+
+/* ── Dialogue text area ──── */
+#dialogue-inner {
+  position: relative;
+  z-index: 4;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  min-height: 90px;
+  justify-content: center;
+}
+
+#dialogue-text {
+  font-size: 15px;
+  line-height: 1.65;
+  color: var(--text-dark);
+  text-shadow: 0 1px 0 rgba(255,255,255,0.4);
+  min-height: 48px;
+}
+
+#dialogue-text .cursor {
+  display: inline-block;
+  width: 2px; height: 14px;
+  background: var(--text-dark);
+  margin-left: 2px;
+  vertical-align: middle;
+  animation: blink 0.7s step-end infinite;
+}
+
+@keyframes blink { 50% { opacity: 0; } }
+
+#dialogue-actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 10px;
+}
+
+#btn-next {
+  font-family: 'Cinzel', serif;
+  font-size: 10px;
+  letter-spacing: 2px;
+  color: var(--text-dark);
+  background: rgba(200,184,152,0.5);
+  border: 1.5px solid var(--border);
+  border-radius: 4px;
+  padding: 5px 16px;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+
+#btn-next:hover { background: rgba(200,184,152,0.85); }
+
+/* ── Quest complete flash ── */
+#quest-flash {
+  position: fixed;
+  inset: 0;
+  background: rgba(200,168,75,0.12);
+  z-index: 50;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.3s;
+}
+#quest-flash.pop {
+  animation: flashPop 0.6s ease-out forwards;
+}
+@keyframes flashPop {
+  0%   { opacity: 1; }
+  100% { opacity: 0; }
+}
+
+/* ─── Start Screen ───────────────────────────────────── */
+#start-screen {
+  position: fixed;
+  inset: 0;
+  background: #0a0008;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 20px;
+  z-index: 100;
+}
+
+#start-screen h1 {
+  font-family: 'Cinzel', serif;
+  font-size: clamp(32px, 10vw, 64px);
+  color: var(--gold);
+  letter-spacing: 6px;
+  text-shadow: 0 0 30px rgba(200,168,75,0.4);
+}
+
+#start-screen p {
+  font-style: italic;
+  color: rgba(200,168,75,0.5);
+  font-size: 13px;
+  letter-spacing: 2px;
+}
+
+#btn-start {
+  margin-top: 8px;
+  font-family: 'Cinzel', serif;
+  font-size: 12px;
+  letter-spacing: 4px;
+  color: var(--gold);
+  background: none;
+  border: 1px solid rgba(200,168,75,0.5);
+  padding: 14px 40px;
+  cursor: pointer;
+  transition: all 0.2s;
+  text-transform: uppercase;
+}
+#btn-start:hover {
+  background: rgba(200,168,75,0.1);
+  border-color: var(--gold);
+}
+
+#loading-bar-wrap {
+  display: none;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+}
+#loading-bar-wrap p {
+  font-family: 'Cinzel', serif;
+  font-size: 10px;
+  letter-spacing: 3px;
+  color: rgba(200,168,75,0.6);
+}
+#loading-bar {
+  width: 180px; height: 2px;
+  background: rgba(200,168,75,0.15);
+  overflow: hidden;
+}
+#loading-bar-inner {
+  height: 100%;
+  background: var(--gold);
+  box-shadow: 0 0 8px var(--gold);
+  animation: loadAnim 3s ease-out forwards;
+}
+@keyframes loadAnim { 0%{width:0%} 100%{width:100%} }
+</style>
+</head>
+<body>
+
+<!-- ═══════════════════════════════════════════════
+     ✦  QUEST SCRIPT — Edit freely below  ✦
+     Each quest: {
+       target:   COCO-SSD class name (see list in README comment below)
+       holdSecs: seconds to hold object in frame (1–5 recommended)
+       dialogue: array of strings — lines spoken before the quest
+       found:    array of strings — lines spoken when quest completes
+     }
+     After all quests, endDialogue plays.
+═══════════════════════════════════════════════ -->
+<!--
+  Common COCO-SSD object names you can use as targets:
+  person, chair, couch, potted plant, bed, dining table, tv, laptop,
+  mouse, keyboard, cell phone, book, clock, vase, cup, bottle, bowl,
+  apple, orange, banana, sandwich, pizza, cake, backpack, umbrella,
+  handbag, tie, suitcase, sports ball, scissors, teddy bear, remote
+-->
+<script>
+const NARRATOR_NAME = "Elara";  // ← change this to your character's name
+
+const QUESTS = [
+  {
+    target:   "cell phone",
+    holdSecs: 2,
+    dialogue: [
+      "Ah... you've finally arrived.",
+      "The signal I sent — did it reach you? Good.",
+      "I need you to prove yourself before I trust you further.",
+      "Find me a communication device. A phone. Hold it steady so I can see it."
+    ],
+    found: [
+      "Yes... there it is.",
+      "So you do know how to follow instructions.",
+      "Keep it. You may need it later."
+    ]
+  },
+  {
+    target:   "book",
+    holdSecs: 3,
+    dialogue: [
+      "There is knowledge scattered in this world that I cannot reach myself.",
+      "Somewhere near you — a book. An old one, perhaps, or perhaps not.",
+      "It doesn't matter which. Bring it into frame and hold it still.",
+      "I'll know when you've found the right one."
+    ],
+    found: [
+      "...",
+      "That's the one.",
+      "I can feel it from here. The pages remember things we've forgotten.",
+      "You're more capable than I expected."
+    ]
+  },
+  {
+    target:   "cup",
+    holdSecs: 2,
+    dialogue: [
+      "One last thing. A small thing.",
+      "Show me something ordinary. Something you drink from.",
+      "Humility is a virtue, you know."
+    ],
+    found: [
+      "Ha. A cup.",
+      "Perfect.",
+      "You've passed. All three trials.",
+      "Come back when the stars look different. I'll have more for you."
+    ]
+  }
+];
+
+const END_DIALOGUE = [
+  "That's all for now.",
+  "The world is still watching, even when you're not looking.",
+  "Until we meet again..."
+];
+</script>
+
+<!-- ═══════════════════════════════════════════════ -->
+
+<!-- Camera Layer -->
+<div id="camera-layer">
+  <video id="video" autoplay muted playsinline></video>
+  <canvas id="detect-canvas"></canvas>
+</div>
+
+<!-- Quest HUD -->
+<div id="quest-hud">
+  <div id="quest-icon">◈</div>
+  <div id="quest-text">
+    SEEKING: <span id="hud-target">—</span>
+  </div>
+</div>
+
+<!-- Capture ring -->
+<div id="capture-wrap">
+  <div id="capture-ring">
+    <svg viewBox="0 0 100 100">
+      <circle class="track" cx="50" cy="50" r="45"/>
+      <circle class="fill"  cx="50" cy="50" r="45" id="ring-fill"/>
+    </svg>
+    <div id="capture-label">
+      HOLD<div class="obj-name" id="ring-obj-name"></div>
+    </div>
+  </div>
+</div>
+
+<!-- Dialogue Box -->
+<div id="dialogue-wrap">
+  <div id="dialogue-box">
+    <div id="scroll-tab"></div>
+    <div class="ornament tr">❧</div>
+    <div class="ornament bl">❧</div>
+
+    <div id="portrait-wrap">
+      <img id="portrait-img" src="./img/profile.jpg" alt="narrator">
+      <div id="portrait-name"></div>
+    </div>
+
+    <div id="dialogue-inner">
+      <div id="dialogue-text"><span class="cursor"></span></div>
+      <div id="dialogue-actions">
+        <button id="btn-next">NEXT ▶</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Quest complete flash -->
+<div id="quest-flash"></div>
+
+<!-- Start Screen -->
+<div id="start-screen">
+  <h1>AR QUEST</h1>
+  <p>A world that watches back</p>
+  <button id="btn-start">Begin</button>
+  <div id="loading-bar-wrap">
+    <p id="loading-msg">AWAKENING...</p>
+    <div id="loading-bar"><div id="loading-bar-inner"></div></div>
+  </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@4.17.0/dist/tf.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@tensorflow-models/coco-ssd@2.2.3/dist/coco-ssd.min.js"></script>
+<script>
+// ─── DOM refs ────────────────────────────────────────────
+const video        = document.getElementById('video');
+const detectCanvas = document.getElementById('detect-canvas');
+const dctx         = detectCanvas.getContext('2d');
+
+const questHud     = document.getElementById('quest-hud');
+const hudTarget    = document.getElementById('hud-target');
+
+const captureWrap  = document.getElementById('capture-wrap');
+const ringFill     = document.getElementById('ring-fill');
+const ringObjName  = document.getElementById('ring-obj-name');
+
+const dialogueWrap = document.getElementById('dialogue-wrap');
+const dialogueText = document.getElementById('dialogue-text');
+const btnNext      = document.getElementById('btn-next');
+const portraitName = document.getElementById('portrait-name');
+const questFlash   = document.getElementById('quest-flash');
+
+const startScreen  = document.getElementById('start-screen');
+const btnStart     = document.getElementById('btn-start');
+const loadingWrap  = document.getElementById('loading-bar-wrap');
+const loadingMsg   = document.getElementById('loading-msg');
+
+// ─── State ───────────────────────────────────────────────
+let model          = null;
+let questIndex     = 0;
+let dialogueIndex  = 0;
+let inDialogue     = false;
+let waitingCapture = false;
+let captureStart   = null;
+let captureTarget  = null;
+let typeTimer      = null;
+let detecting      = false;
+let phase          = 'intro'; // 'intro' | 'quest' | 'found' | 'end'
+
+const CIRCUMFERENCE = 2 * Math.PI * 45; // matches r=45
+
+// ─── Init ────────────────────────────────────────────────
+portraitName.textContent = NARRATOR_NAME;
+
+btnStart.addEventListener('click', async () => {
+  btnStart.style.display = 'none';
+  loadingWrap.style.display = 'flex';
+
+  try {
+    const stream = await navigator.mediaDevices.getUserMedia({
+      video: { facingMode: 'environment', width:{ideal:1280}, height:{ideal:720} }
+    });
+    video.srcObject = stream;
+    await video.play();
+    loadingMsg.textContent = 'LOADING MODEL...';
+    model = await cocoSsd.load({ base: 'mobilenet_v2' });
+    loadingMsg.textContent = 'READY';
+    setTimeout(() => {
+      startScreen.style.display = 'none';
+      resizeCanvas();
+      startQuest(0);
+      detectLoop();
+    }, 600);
+  } catch(e) {
+    loadingMsg.textContent = 'ERROR: ' + e.message;
+    loadingMsg.style.color = '#ff4444';
+  }
+});
+
+// ─── Canvas resize ───────────────────────────────────────
+function resizeCanvas() {
+  detectCanvas.width  = window.innerWidth;
+  detectCanvas.height = window.innerHeight;
+}
+window.addEventListener('resize', resizeCanvas);
+
+// ─── Quest flow ──────────────────────────────────────────
+function startQuest(idx) {
+  questIndex    = idx;
+  dialogueIndex = 0;
+  phase = 'intro';
+
+  if (idx >= QUESTS.length) {
+    // All quests done — play end dialogue
+    phase = 'end';
+    questHud.classList.remove('visible');
+    showDialogue(END_DIALOGUE);
+    return;
+  }
+
+  const q = QUESTS[idx];
+  hudTarget.innerHTML = q.target.toUpperCase();
+  hudTarget.nextElementSibling && (hudTarget.nextElementSibling.textContent = 'Hold for ' + q.holdSecs + 's');
+
+  showDialogue(q.dialogue, () => {
+    // After intro dialogue, activate quest
+    phase = 'quest';
+    waitingCapture = true;
+    captureTarget  = q.target;
+    questHud.classList.add('visible');
+
+    const span = document.createElement('span');
+    span.textContent = `Hold for ${q.holdSecs}s`;
+    hudTarget.parentNode.appendChild(span);
+  });
+}
+
+// ─── Dialogue system ─────────────────────────────────────
+let dialogueLines    = [];
+let onDialogueDone   = null;
+let currentLineIdx   = 0;
+let typing           = false;
+
+function showDialogue(lines, onDone) {
+  dialogueLines  = lines;
+  onDialogueDone = onDone || null;
+  currentLineIdx = 0;
+  inDialogue     = true;
+  dialogueWrap.classList.add('open');
+  btnNext.style.display = 'block';
+  typeLine(dialogueLines[0]);
+}
+
+function typeLine(line) {
+  clearTimeout(typeTimer);
+  typing = true;
+  dialogueText.innerHTML = '';
+  let i = 0;
+  const cursor = document.createElement('span');
+  cursor.className = 'cursor';
+
+  function tick() {
+    if (i < line.length) {
+      dialogueText.textContent = line.slice(0, ++i);
+      dialogueText.appendChild(cursor);
+      typeTimer = setTimeout(tick, 28);
+    } else {
+      typing = false;
+    }
+  }
+  tick();
+}
+
+btnNext.addEventListener('click', () => {
+  if (typing) {
+    // Skip to end of current line
+    clearTimeout(typeTimer);
+    typing = false;
+    dialogueText.textContent = dialogueLines[currentLineIdx];
+    return;
+  }
+
+  currentLineIdx++;
+  if (currentLineIdx < dialogueLines.length) {
+    typeLine(dialogueLines[currentLineIdx]);
+  } else {
+    // Dialogue finished
+    dialogueWrap.classList.remove('open');
+    inDialogue = false;
+    dialogueText.innerHTML = '<span class="cursor"></span>';
+    if (onDialogueDone) onDialogueDone();
+  }
+});
+
+// ─── Detection loop ──────────────────────────────────────
+async function detectLoop() {
+  if (!model || video.readyState < 2) {
+    requestAnimationFrame(detectLoop);
+    return;
+  }
+
+  const preds = await model.detect(video);
+  drawDetections(preds);
+
+  // Quest capture logic
+  if (waitingCapture && captureTarget && !inDialogue) {
+    const hit = preds.find(p =>
+      p.class === captureTarget && p.score > 0.45
+    );
+
+    if (hit) {
+      if (!captureStart) captureStart = performance.now();
+      const elapsed  = (performance.now() - captureStart) / 1000;
+      const required = QUESTS[questIndex].holdSecs;
+      const progress = Math.min(elapsed / required, 1);
+
+      // Update ring
+      ringFill.style.strokeDashoffset = CIRCUMFERENCE * (1 - progress);
+      ringObjName.textContent = captureTarget;
+      captureWrap.classList.add('active');
+
+      if (progress >= 1) {
+        // ✓ Captured!
+        onObjectCaptured();
+      }
+    } else {
+      // Reset if lost
+      captureStart = null;
+      ringFill.style.strokeDashoffset = CIRCUMFERENCE;
+      captureWrap.classList.remove('active');
+    }
+  }
+
+  requestAnimationFrame(detectLoop);
+}
+
+function onObjectCaptured() {
+  waitingCapture = false;
+  captureStart   = null;
+  captureWrap.classList.remove('active');
+  questHud.classList.remove('visible');
+
+  // Flash
+  questFlash.classList.remove('pop');
+  void questFlash.offsetWidth;
+  questFlash.classList.add('pop');
+
+  const q = QUESTS[questIndex];
+  phase = 'found';
+  showDialogue(q.found, () => {
+    // Advance to next quest
+    startQuest(questIndex + 1);
+  });
+}
+
+// ─── Draw detections ─────────────────────────────────────
+const COLORS = ['#c8a84b','#a890d8','#6eb8c0','#d8886e','#88b86e','#c06eb8'];
+const classColor = {};
+let colorIdx = 0;
+
+function getColor(cls) {
+  if (!classColor[cls]) classColor[cls] = COLORS[colorIdx++ % COLORS.length];
+  return classColor[cls];
+}
+
+function drawDetections(preds) {
+  dctx.clearRect(0, 0, detectCanvas.width, detectCanvas.height);
+
+  preds.forEach(p => {
+    const [x,y,w,h] = p.bbox;
+    const sx = Math.max(
+      detectCanvas.width  / video.videoWidth,
+      detectCanvas.height / video.videoHeight
+    );
+    const ox = (detectCanvas.width  - video.videoWidth  * sx) / 2;
+    const oy = (detectCanvas.height - video.videoHeight * sx) / 2;
+    const rx = x*sx+ox, ry = y*sx+oy, rw = w*sx, rh = h*sx;
+
+    const isTarget = waitingCapture && p.class === captureTarget && p.score > 0.45;
+    const col = isTarget ? '#c8a84b' : getColor(p.class);
+
+    dctx.shadowColor = col;
+    dctx.shadowBlur  = isTarget ? 20 : 8;
+    dctx.strokeStyle = col;
+    dctx.lineWidth   = isTarget ? 2.5 : 1.5;
+    dctx.strokeRect(rx, ry, rw, rh);
+
+    // Corner ticks
+    const t = 14;
+    dctx.lineWidth = isTarget ? 3.5 : 2.5;
+    [[rx,ry,1,1],[rx+rw,ry,-1,1],[rx,ry+rh,1,-1],[rx+rw,ry+rh,-1,-1]].forEach(([cx,cy,dx,dy])=>{
+      dctx.beginPath();
+      dctx.moveTo(cx+dx*t, cy); dctx.lineTo(cx,cy); dctx.lineTo(cx,cy+dy*t);
+      dctx.stroke();
+    });
+    dctx.shadowBlur = 0;
+
+    // Label
+    const label = `${p.class}  ${Math.round(p.score*100)}%`;
+    const fs = Math.max(10, Math.min(13, rw/9));
+    dctx.font = `${fs}px 'IM Fell English', serif`;
+    const tw = dctx.measureText(label).width;
+    const lh = fs + 10;
+    const ly = ry - lh - 4 < 0 ? ry + 4 : ry - lh - 4;
+
+    dctx.fillStyle = col;
+    dctx.globalAlpha = 0.18;
+    dctx.fillRect(rx, ly, tw+16, lh);
+    dctx.globalAlpha = 1;
+    dctx.strokeStyle = col; dctx.lineWidth = 1;
+    dctx.shadowColor = col; dctx.shadowBlur = 6;
+    dctx.strokeRect(rx, ly, tw+16, lh);
+    dctx.shadowBlur = 0;
+    dctx.fillStyle = '#ffffffee';
+    dctx.fillText(label, rx+8, ly+fs+3);
+  });
+}
+</script>
+</body>
 </html>
