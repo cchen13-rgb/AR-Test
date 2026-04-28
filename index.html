@@ -7,11 +7,11 @@
   <link rel="stylesheet" href="https://use.typekit.net/mjw2tfe.css">
   <style>
     :root {
-      --blue:    #1f97dd;
-      --blue-dk: #19669a;
-      --border:  rgba(35, 113, 176, 0.55);
-      --ink:     #124570;
-      --pink:    #ff7da4;
+      --rose:    #c9737a;
+      --rose-dk: #6b2d35;
+      --border:  rgba(180, 90, 110, 0.50);
+      --ink:     #4a1520;
+      --accent:  #d4686e;
     }
 
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
@@ -55,10 +55,10 @@
       flex-direction: column;
     }
 
-    /* All panels: light opaque bg so text stays legible over dithered background */
+    /* All panels: warm pinkish tint */
     .panel {
       border: 2px solid var(--border);
-      background: rgba(239, 248, 255, 0.92);
+      background: rgba(253, 240, 242, 0.92);
     }
 
     /* ── TEXTURE PANELS ── */
@@ -116,9 +116,8 @@
       font-family: "fayte-pixel-hard", sans-serif;
       font-size: clamp(60px, 19vw, 92px);
       line-height: 0.88;
-      color: var(--blue);
+      color: var(--rose);
       text-transform: uppercase;
-      
     }
 
     .on-row {
@@ -182,14 +181,14 @@
     .quest-eyebrow {
       font-size: 8px;
       letter-spacing: 3px;
-      color: var(--pink);
+      color: var(--accent);
       opacity: 0.8;
       margin-bottom: 7px;
     }
     #questText {
       font-size: 12px;
       letter-spacing: 1px;
-      color: var(--pink);
+      color: var(--accent);
       line-height: 1.75;
       white-space: pre-line;
     }
@@ -234,7 +233,7 @@
       opacity: 0;
       pointer-events: none;
       transition: opacity 0.3s;
-      text-shadow: 0 0 10px var(--blue);
+      text-shadow: 0 0 10px var(--rose);
     }
     #holdLabel.show { opacity: 0.9; }
 
@@ -268,7 +267,7 @@
     #speakerName {
       font-size: 8px;
       letter-spacing: 3px;
-      color: var(--blue-dk);
+      color: var(--rose-dk);
       opacity: 0.7;
     }
     #dialogueText {
@@ -375,7 +374,7 @@ const STORY = [
 
 let model = null, chapter = 0, introIdx = 0;
 let isCapturing = false, holdStart = null, typeTimer = null;
-let running = false; // guard against concurrent detect calls
+let running = false;
 
 const video     = document.getElementById('video');
 const canvas    = document.getElementById('canvas');
@@ -383,14 +382,11 @@ const ctx       = canvas.getContext('2d');
 const questEl   = document.getElementById('questText');
 
 // ── DITHER SETUP ──
-// Offscreen canvas for pixel-level processing
 const offscreen = document.createElement('canvas');
 const offCtx    = offscreen.getContext('2d', { willReadFrequently: true });
 
-// Scale factor — higher = more legible, less chunky
 const DITHER_SCALE = 0.42;
 
-// 4×4 Bayer ordered dither matrix (values 0–15)
 const BAYER = [
    0,  8,  2, 10,
   12,  4, 14,  6,
@@ -398,9 +394,9 @@ const BAYER = [
   15,  7, 13,  5
 ];
 
-// Two-tone palette — softened dark so contrast is readable not harsh
-const DARK  = [52,  95, 145];
-const LIGHT = [218, 238, 252];
+// Burgundy dark / blush light — matches reference palette
+const DARK  = [74,  21,  32];   // deep burgundy
+const LIGHT = [252, 232, 235];  // warm blush
 
 function applyDither() {
   const w = Math.max(1, Math.floor(canvas.width  * DITHER_SCALE));
@@ -408,7 +404,6 @@ function applyDither() {
   if (offscreen.width !== w)  offscreen.width  = w;
   if (offscreen.height !== h) offscreen.height = h;
 
-  // Replicate CSS object-fit:cover so the dithered frame isn't stretched
   const vw = video.videoWidth, vh = video.videoHeight;
   const scale = Math.max(w / vw, h / vh);
   const sw = vw * scale, sh = vh * scale;
@@ -420,9 +415,7 @@ function applyDither() {
   for (let y = 0; y < h; y++) {
     for (let x = 0; x < w; x++) {
       const i = (y * w + x) * 4;
-      // Perceptual luminance
       const lum = 0.299 * d[i] + 0.587 * d[i+1] + 0.114 * d[i+2];
-      // Bayer threshold 0–255
       const threshold = (BAYER[(y % 4) * 4 + (x % 4)] / 15) * 255;
       const col = lum > threshold ? LIGHT : DARK;
       d[i]   = col[0];
@@ -433,8 +426,6 @@ function applyDither() {
   }
 
   offCtx.putImageData(imgData, 0, 0);
-
-  // Scale back up sharp (no smoothing = chunky pixels)
   ctx.imageSmoothingEnabled = false;
   ctx.drawImage(offscreen, 0, 0, canvas.width, canvas.height);
 }
@@ -454,54 +445,50 @@ function drawVCR() {
   const w = canvas.width, h = canvas.height;
   ctx.save();
 
-  // ── Initial white flash ──
   if (elapsed < 100) {
-    ctx.fillStyle = `rgba(255,255,255,${0.7 * (1 - elapsed / 100)})`;
+    ctx.fillStyle = `rgba(255,220,225,${0.7 * (1 - elapsed / 100)})`;
     ctx.fillRect(0, 0, w, h);
     ctx.restore();
     return;
   }
 
-  // ── Bright scanline band sweeping down ──
   const scanY = t * h;
   const grad = ctx.createLinearGradient(0, scanY - 28, 0, scanY + 28);
-  grad.addColorStop(0,   'rgba(255,255,255,0)');
-  grad.addColorStop(0.3, 'rgba(218,238,252,0.55)');
-  grad.addColorStop(0.5, 'rgba(255,255,255,0.85)');
-  grad.addColorStop(0.7, 'rgba(218,238,252,0.55)');
-  grad.addColorStop(1,   'rgba(255,255,255,0)');
+  grad.addColorStop(0,   'rgba(255,200,210,0)');
+  grad.addColorStop(0.3, 'rgba(240,180,190,0.55)');
+  grad.addColorStop(0.5, 'rgba(255,220,225,0.85)');
+  grad.addColorStop(0.7, 'rgba(240,180,190,0.55)');
+  grad.addColorStop(1,   'rgba(255,200,210,0)');
   ctx.fillStyle = grad;
   ctx.fillRect(0, scanY - 28, w, 56);
 
-  // ── Glitch lines — random horizontal slices with pink tint ──
   const glitchCount = Math.floor(4 * (1 - t));
   for (let i = 0; i < glitchCount; i++) {
     const gy     = Math.random() * scanY;
     const gh     = Math.random() * 3 + 1;
     const offset = (Math.random() - 0.5) * 18;
-    ctx.fillStyle = `rgba(176,122,138,${Math.random() * 0.45})`;
+    ctx.fillStyle = `rgba(180,80,100,${Math.random() * 0.45})`;
     ctx.fillRect(offset, gy, w, gh);
   }
 
-  // ── Subtle blue overlay on already-scanned area ──
-  ctx.fillStyle = `rgba(126,192,232,${0.12 * (1 - t)})`;
+  ctx.fillStyle = `rgba(200,120,130,${0.12 * (1 - t)})`;
   ctx.fillRect(0, 0, w, scanY);
 
-  // ── Thin repeating scanlines on the whole frame ──
   ctx.fillStyle = `rgba(0,0,0,${0.06 * (1 - t)})`;
   for (let y = 0; y < h; y += 4) ctx.fillRect(0, y, w, 1);
 
   ctx.restore();
 }
+
 const chapterEl = document.getElementById('chapterBar');
 const diagEl    = document.getElementById('dialogueText');
 const speakerEl = document.getElementById('speakerName');
 const holdLabel = document.getElementById('holdLabel');
 
 // ── DITHER BACKGROUND GRADIENT ──
-// Uses the gradient's own colour range: dark stop → light stop
-const BG_DARK  = [126, 192, 232]; // #7ec0e8
-const BG_LIGHT = [247, 252, 255]; // #f7fcff
+// Dusty rose → light blush (matches reference pink gradient)
+const BG_DARK  = [210, 140, 150]; // #d28c96
+const BG_LIGHT = [252, 240, 242]; // #fcf0f2
 
 function ditherBackground() {
   const bgCanvas = document.getElementById('bg-canvas');
@@ -509,15 +496,15 @@ function ditherBackground() {
   const w = Math.max(1, Math.floor(W * DITHER_SCALE));
   const h = Math.max(1, Math.floor(H * DITHER_SCALE));
 
-  // Draw the gradient at reduced resolution
   const tmp = document.createElement('canvas');
   tmp.width = w; tmp.height = h;
   const tc = tmp.getContext('2d', { willReadFrequently: true });
   const grad = tc.createLinearGradient(0, 0, 0, h);
-  grad.addColorStop(0,    '#7ec0e8');
-  grad.addColorStop(0.30, '#d5eaf6');
-  grad.addColorStop(0.65, '#eff8ff');
-  grad.addColorStop(1,    '#f7fcff');
+  // Matches the reference: deeper rose at top, soft blush/cream at bottom
+  grad.addColorStop(0,    '#d28c96');
+  grad.addColorStop(0.30, '#e8b4bc');
+  grad.addColorStop(0.65, '#f5d8dc');
+  grad.addColorStop(1,    '#fcf0f2');
   tc.fillStyle = grad;
   tc.fillRect(0, 0, w, h);
 
@@ -534,7 +521,6 @@ function ditherBackground() {
   }
   tc.putImageData(imgData, 0, 0);
 
-  // Scale up sharp to full screen
   bgCanvas.width  = W;
   bgCanvas.height = H;
   const bc = bgCanvas.getContext('2d');
@@ -557,12 +543,11 @@ function ditherImg(img) {
   for (let y = 0; y < c.height; y++) {
     for (let x = 0; x < c.width; x++) {
       const i = (y * c.width + x) * 4;
-      if (d[i+3] === 0) continue; // keep transparent pixels untouched
+      if (d[i+3] === 0) continue;
       const lum = 0.299 * d[i] + 0.587 * d[i+1] + 0.114 * d[i+2];
       const threshold = (BAYER[(y % 4) * 4 + (x % 4)] / 15) * 255;
       const col = lum > threshold ? LIGHT : DARK;
       d[i] = col[0]; d[i+1] = col[1]; d[i+2] = col[2];
-      // d[i+3] left as-is to preserve original alpha
     }
   }
   cx.putImageData(imgData, 0, 0);
@@ -592,14 +577,12 @@ async function boot() {
     video.srcObject = stream;
     await video.play();
 
-    // Load model
     model = await cocoSsd.load({ base: 'mobilenet_v2' });
 
     resizeCanvas();
     loadChapter(0);
     showScreen('s-game');
 
-    // Start the loop ONCE
     loop();
   } catch(e) {
     console.error(e);
@@ -607,28 +590,23 @@ async function boot() {
   }
 }
 
-// ── DETECT LOOP — rAF called at END so no concurrent detections ──
 async function loop() {
   if (model && video.readyState >= 2 && video.videoWidth > 0) {
     resizeCanvas();
     try {
       const preds = await model.detect(video);
 
-      // Dithered video frame as background, then boxes on top
       applyDither();
 
       const ch  = STORY[chapter];
       const hit = preds.find(p => p.class === ch.target && p.score > 0.3);
 
-      // Draw ALL detections with labels
       preds.forEach(p => drawBox(p, p.class === ch.target));
 
-      // VCR sweep overlay
       drawVCR();
 
-      // Debug counter top-left
       ctx.font = 'bold 12px monospace';
-      ctx.fillStyle = 'rgba(255,255,255,0.85)';
+      ctx.fillStyle = 'rgba(252,232,235,0.85)';
       ctx.fillText(`${preds.length} object${preds.length !== 1 ? 's' : ''} detected`, 10, 20);
 
       if (!isCapturing) {
@@ -647,7 +625,6 @@ async function loop() {
       console.warn('Detection error:', e);
     }
   }
-  // Schedule NEXT frame only after this one is fully done
   requestAnimationFrame(loop);
 }
 
@@ -657,7 +634,6 @@ function loadChapter(i) {
   holdLabel.classList.remove('show');
   const ch = STORY[i];
 
-  // Fade out → update text → fade in
   chapterEl.classList.add('fade');
   setTimeout(() => {
     chapterEl.textContent = ch.chapter;
@@ -741,7 +717,8 @@ function project(bbox) {
 
 function drawBox(pred, isTarget) {
   const { x, y, w, h } = project(pred.bbox);
-  const col  = isTarget ? '#7ab3d4' : 'rgba(255,255,255,0.7)';
+  // Rose for target, soft pink-white for others
+  const col  = isTarget ? '#c9909a' : 'rgba(252,232,235,0.7)';
   const tick = isTarget ? 14 : 10;
   ctx.strokeStyle = col;
   ctx.lineWidth   = isTarget ? 2 : 1.5;
@@ -756,17 +733,15 @@ function drawBox(pred, isTarget) {
   });
   ctx.shadowBlur = 0;
 
-  // Label on EVERY detection
   const label = `${pred.class}  ${Math.round(pred.score * 100)}%`;
   ctx.font = `${isTarget ? 'bold ' : ''}12px monospace`;
   const tw = ctx.measureText(label).width;
   const lx = x, ly = y > 20 ? y - 6 : y + h + 16;
 
-  // Background pill for readability
-  ctx.fillStyle = isTarget ? 'rgba(122,179,212,0.85)' : 'rgba(0,0,0,0.5)';
+  ctx.fillStyle = isTarget ? 'rgba(180,100,115,0.85)' : 'rgba(74,21,32,0.55)';
   ctx.fillRect(lx, ly - 13, tw + 8, 17);
 
-  ctx.fillStyle = '#ffffff';
+  ctx.fillStyle = '#fce8eb';
   ctx.fillText(label, lx + 4, ly);
 }
 
@@ -775,14 +750,14 @@ function drawArc(pred, progress) {
   const cx = x+w/2, cy = y+h/2, r = Math.max(w,h)*0.56;
   ctx.beginPath();
   ctx.arc(cx, cy, r, 0, Math.PI*2);
-  ctx.strokeStyle = 'rgba(122,179,212,0.2)';
+  ctx.strokeStyle = 'rgba(201,115,122,0.2)';
   ctx.lineWidth = 3;
   ctx.stroke();
   ctx.beginPath();
   ctx.arc(cx, cy, r, -Math.PI/2, -Math.PI/2 + Math.PI*2*progress);
-  ctx.strokeStyle = '#7ab3d4';
+  ctx.strokeStyle = '#c9737a';
   ctx.lineWidth = 3;
-  ctx.shadowColor = '#7ab3d4';
+  ctx.shadowColor = '#c9737a';
   ctx.shadowBlur = 14;
   ctx.stroke();
   ctx.shadowBlur = 0;
