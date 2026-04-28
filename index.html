@@ -1,847 +1,637 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>AR Quest</title>
-<link href="https://fonts.googleapis.com/css2?family=IM+Fell+English:ital@0;1&family=Cinzel:wght@400;600&display=swap" rel="stylesheet">
-<style>
-/* ─── Reset ─────────────────────────────────────────── */
-*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Kardia on Phone</title>
+  <link rel="stylesheet" href="https://use.typekit.net/mjw2tfe.css">
+  <style>
+    :root {
+      --sky:      #b8d8ee;
+      --sky-mid:  #8fb8d8;
+      --sky-deep: #6aa0c4;
+      --cream:    #e8e2d6;
+      --cream-lt: #f2ede4;
+      --border:   rgba(90,140,175,0.42);
+      --ink:      #3d6080;
+      --ink-lt:   #6a90aa;
+    }
 
-:root {
-  --parchment:   #e8e0d0;
-  --parchment2:  #d4c8b0;
-  --diamond-a:   #9e9ab8;
-  --diamond-b:   #b8b4cc;
-  --border:      #1a1a2e;
-  --scroll-bg:   #c8b898;
-  --scroll-edge: #a09070;
-  --text-dark:   #1a1520;
-  --text-mid:    #3a3050;
-  --gold:        #c8a84b;
-  --capture-bg:  rgba(200,168,75,0.15);
-}
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    html, body { height: 100%; overflow: hidden; }
 
-body {
-  background: #0a0008;
-  overflow: hidden;
-  height: 100dvh;
-  width: 100vw;
-  font-family: 'IM Fell English', serif;
-  user-select: none;
-}
+    body {
+      font-family: "fayte-pixel", monospace;
+      background: linear-gradient(180deg, #aacee8 0%, #c8dff2 50%, #b8cede 100%);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
 
-/* ─── Camera Layer ───────────────────────────────────── */
-#camera-layer {
-  position: fixed;
-  inset: 0;
-}
+    /* ── SCREEN SYSTEM ── */
+    .screen {
+      position: fixed;
+      inset: 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 0.85s ease;
+    }
+    .screen.active { opacity: 1; pointer-events: all; }
 
-video {
-  position: absolute;
-  inset: 0;
-  width: 100%; height: 100%;
-  object-fit: cover;
-}
+    /* ── PHONE COLUMN ── */
+    .layout {
+      width: min(480px, 100vw);
+      height: 100dvh;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
 
-canvas#detect-canvas {
-  position: absolute;
-  inset: 0;
-  width: 100%; height: 100%;
-}
+    /* ── TEXTURE PANELS ── */
+    .tex {
+      flex-shrink: 0;
+      height: 26vh;
+      max-height: 185px;
+      border: 1px solid var(--border);
+      background: var(--cream-lt);
+      overflow: hidden;
+    }
+    .tex img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      display: block;
+      opacity: 0.52;
+      mix-blend-mode: multiply;
+    }
+    .tex.flip { transform: scaleY(-1); }
 
-/* ─── Quest HUD (top) ────────────────────────────────── */
-#quest-hud {
-  position: fixed;
-  top: 0; left: 0; right: 0;
-  padding: 14px 20px;
-  display: flex;
-  align-items: center;
-  gap: 14px;
-  background: linear-gradient(to bottom, rgba(10,0,8,0.75) 60%, transparent);
-  z-index: 30;
-  pointer-events: none;
-  opacity: 0;
-  transition: opacity 0.5s;
-}
+    /* ════════════════════
+       TITLE SCREEN
+    ════════════════════ */
+    .click-bar {
+      flex-shrink: 0;
+      border: 1px solid var(--border);
+      background: var(--cream-lt);
+      padding: 14px 20px;
+      text-align: center;
+      font-size: 11px;
+      letter-spacing: 3px;
+      color: var(--ink);
+      cursor: pointer;
+      user-select: none;
+      transition: background 0.18s;
+    }
+    .click-bar:hover { background: var(--cream); }
+    .click-bar strong { font-size: 15px; letter-spacing: 1px; }
 
-#quest-hud.visible { opacity: 1; }
+    .title-mid {
+      flex: 1;
+      border: 1px solid var(--border);
+      background: var(--cream);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      padding: 28px 20px;
+      gap: 2px;
+    }
 
-#quest-icon {
-  font-size: 22px;
-  filter: drop-shadow(0 0 6px var(--gold));
-}
+    .alt-tag {
+      font-size: 9px;
+      letter-spacing: 5px;
+      color: var(--ink-lt);
+      opacity: 0.55;
+      text-transform: uppercase;
+      margin-bottom: 14px;
+    }
 
-#quest-text {
-  font-family: 'Cinzel', serif;
-  font-size: 11px;
-  letter-spacing: 2px;
-  color: var(--gold);
-  text-shadow: 0 0 12px rgba(200,168,75,0.5);
-}
+    .big-title {
+      font-family: "fayte-pixel", monospace;
+      font-size: clamp(58px, 18.5vw, 90px);
+      line-height: 0.88;
+      color: var(--sky-mid);
+      text-transform: uppercase;
+      text-shadow: 3px 3px 0 rgba(61,96,128,0.15);
+    }
 
-#quest-text span {
-  display: block;
-  font-size: 9px;
-  letter-spacing: 1px;
-  color: rgba(200,168,75,0.55);
-  margin-top: 2px;
-  font-family: 'IM Fell English', serif;
-  font-style: italic;
-}
+    .on-row {
+      display: flex;
+      align-items: center;
+      gap: 14px;
+      padding: 10px 0;
+      width: 100%;
+      justify-content: center;
+    }
+    .on-row span { font-size: 11px; letter-spacing: 6px; color: var(--ink-lt); opacity: 0.5; }
+    .on-row::before, .on-row::after {
+      content: '';
+      flex: 1; max-width: 72px;
+      height: 1px;
+      background: var(--sky-deep);
+      opacity: 0.28;
+    }
 
-/* ─── Capture Timer Ring ─────────────────────────────── */
-#capture-wrap {
-  position: fixed;
-  inset: 0;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  z-index: 25;
-  pointer-events: none;
-  opacity: 0;
-  transition: opacity 0.3s;
-}
+    /* ════════════════════
+       LOADING SCREEN
+    ════════════════════ */
+    .spacer {
+      flex-shrink: 0;
+      height: 50px;
+      border: 1px solid var(--border);
+      background: var(--sky);
+    }
 
-#capture-wrap.active { opacity: 1; }
+    .loading-mid {
+      flex: 1;
+      border: 1px solid var(--border);
+      background: var(--cream);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 22px;
+    }
 
-#capture-ring {
-  position: relative;
-  width: 100px; height: 100px;
-}
+    #compassSvg {
+      animation: spin 5s linear infinite;
+      transform-origin: center;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
 
-#capture-ring svg {
-  transform: rotate(-90deg);
-  width: 100%; height: 100%;
-}
+    .load-lbl {
+      font-size: 14px;
+      letter-spacing: 4px;
+      color: var(--ink-lt);
+    }
 
-#capture-ring circle.track {
-  fill: none;
-  stroke: rgba(200,168,75,0.2);
-  stroke-width: 3;
-}
+    /* ════════════════════
+       GAME SCREEN
+    ════════════════════ */
+    .quest-zone {
+      flex-shrink: 0;
+      border: 1px solid var(--border);
+      background: var(--sky);
+      padding: 13px 15px;
+      min-height: 94px;
+    }
+    .quest-eyebrow {
+      font-size: 8px;
+      letter-spacing: 3px;
+      color: var(--ink);
+      opacity: 0.42;
+      margin-bottom: 7px;
+    }
+    #questText {
+      font-size: 12px;
+      letter-spacing: 1px;
+      color: var(--ink);
+      line-height: 1.75;
+      white-space: pre-line;
+    }
 
-#capture-ring circle.fill {
-  fill: none;
-  stroke: var(--gold);
-  stroke-width: 3;
-  stroke-dasharray: 283;
-  stroke-dashoffset: 283;
-  transition: stroke-dashoffset 0.1s linear;
-  filter: drop-shadow(0 0 6px var(--gold));
-}
+    .chapter-strip {
+      flex-shrink: 0;
+      border: 1px solid var(--border);
+      background: var(--cream-lt);
+      padding: 10px 16px;
+      text-align: center;
+      font-size: 13px;
+      letter-spacing: 2px;
+      color: var(--ink);
+    }
 
-#capture-label {
-  position: absolute;
-  inset: 0;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  font-family: 'Cinzel', serif;
-  font-size: 9px;
-  letter-spacing: 2px;
-  color: var(--gold);
-  text-shadow: 0 0 8px var(--gold);
-}
+    .cam-zone {
+      flex: 1;
+      min-height: 0;
+      border: 1px solid var(--border);
+      background: var(--sky-mid);
+      position: relative;
+      overflow: hidden;
+    }
+    .cam-zone video,
+    .cam-zone canvas {
+      position: absolute;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+    }
+    #holdLabel {
+      position: absolute;
+      bottom: 10px;
+      left: 50%;
+      transform: translateX(-50%);
+      font-size: 10px;
+      letter-spacing: 3px;
+      color: #fff;
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 0.3s;
+      text-shadow: 0 0 10px var(--sky-deep);
+    }
+    #holdLabel.show { opacity: 0.9; }
 
-#capture-label .obj-name {
-  font-size: 11px;
-  font-style: italic;
-  font-family: 'IM Fell English', serif;
-  margin-top: 2px;
-}
-
-/* ─── Dialogue Box ───────────────────────────────────── */
-#dialogue-wrap {
-  position: fixed;
-  bottom: 0; left: 0; right: 0;
-  z-index: 40;
-  padding: 0 16px 20px;
-  transform: translateY(120%);
-  transition: transform 0.45s cubic-bezier(0.22, 1, 0.36, 1);
-}
-
-#dialogue-wrap.open { transform: translateY(0); }
-
-#dialogue-box {
-  position: relative;
-  border-radius: 14px;
-  border: 2.5px solid var(--border);
-  overflow: visible;
-  /* Harlequin diamond background */
-  background-color: var(--diamond-b);
-  background-image:
-    linear-gradient(135deg, var(--diamond-a) 25%, transparent 25%),
-    linear-gradient(225deg, var(--diamond-a) 25%, transparent 25%),
-    linear-gradient(315deg, var(--diamond-a) 25%, transparent 25%),
-    linear-gradient(45deg,  var(--diamond-a) 25%, transparent 25%);
-  background-size: 28px 28px;
-  background-position: 0 0, 0 14px, 14px -14px, -14px 0;
-  box-shadow:
-    0 -4px 32px rgba(0,0,0,0.5),
-    inset 0 0 0 1px rgba(255,255,255,0.08);
-  min-height: 130px;
-  padding: 20px 20px 20px 130px;
-}
-
-/* Gradient wash left→right so text area is readable */
-#dialogue-box::after {
-  content: '';
-  position: absolute;
-  inset: 0;
-  border-radius: 12px;
-  background: linear-gradient(
-    to right,
-    rgba(180,170,200,0.35) 0%,
-    rgba(200,195,215,0.55) 40%,
-    rgba(210,205,225,0.65) 100%
-  );
-  pointer-events: none;
-}
-
-/* ── Scroll tab (top-left) ───── */
-#scroll-tab {
-  position: absolute;
-  top: -18px; left: 24px;
-  width: 160px; height: 34px;
-  background: linear-gradient(to bottom, var(--parchment), var(--scroll-bg));
-  border: 2px solid var(--border);
-  border-radius: 6px 6px 0 0;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  overflow: hidden;
-  z-index: 2;
-}
-
-#scroll-tab::before {
-  content: '✾ ✦ ✾';
-  font-size: 10px;
-  color: var(--scroll-edge);
-  letter-spacing: 4px;
-  opacity: 0.7;
-}
-
-/* ── Corner ornaments ─────── */
-.ornament {
-  position: absolute;
-  font-size: 22px;
-  line-height: 1;
-  color: var(--border);
-  z-index: 3;
-  pointer-events: none;
-}
-.ornament.tr { top: -6px; right: -4px; transform: scaleX(-1); }
-.ornament.bl { bottom: -6px; left: -4px; transform: scaleY(-1); }
-
-/* ── Profile portrait ─────── */
-#portrait-wrap {
-  position: absolute;
-  left: 16px;
-  bottom: 10px;
-  width: 100px;
-  z-index: 5;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 4px;
-}
-
-#portrait-img {
-  width: 90px;
-  height: 90px;
-  border-radius: 50%;
-  object-fit: cover;
-  border: 3px solid var(--border);
-  box-shadow:
-    0 0 0 2px var(--diamond-a),
-    0 4px 16px rgba(0,0,0,0.5);
-}
-
-#portrait-name {
-  font-family: 'Cinzel', serif;
-  font-size: 9px;
-  letter-spacing: 1.5px;
-  color: var(--text-dark);
-  text-align: center;
-  background: rgba(200,184,152,0.7);
-  padding: 2px 8px;
-  border: 1px solid rgba(26,26,46,0.25);
-  border-radius: 3px;
-  white-space: nowrap;
-}
-
-/* ── Dialogue text area ──── */
-#dialogue-inner {
-  position: relative;
-  z-index: 4;
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-  min-height: 90px;
-  justify-content: center;
-}
-
-#dialogue-text {
-  font-size: 15px;
-  line-height: 1.65;
-  color: var(--text-dark);
-  text-shadow: 0 1px 0 rgba(255,255,255,0.4);
-  min-height: 48px;
-}
-
-#dialogue-text .cursor {
-  display: inline-block;
-  width: 2px; height: 14px;
-  background: var(--text-dark);
-  margin-left: 2px;
-  vertical-align: middle;
-  animation: blink 0.7s step-end infinite;
-}
-
-@keyframes blink { 50% { opacity: 0; } }
-
-#dialogue-actions {
-  display: flex;
-  align-items: center;
-  justify-content: flex-end;
-  gap: 10px;
-}
-
-#btn-next {
-  font-family: 'Cinzel', serif;
-  font-size: 10px;
-  letter-spacing: 2px;
-  color: var(--text-dark);
-  background: rgba(200,184,152,0.5);
-  border: 1.5px solid var(--border);
-  border-radius: 4px;
-  padding: 5px 16px;
-  cursor: pointer;
-  transition: background 0.15s;
-}
-
-#btn-next:hover { background: rgba(200,184,152,0.85); }
-
-/* ── Quest complete flash ── */
-#quest-flash {
-  position: fixed;
-  inset: 0;
-  background: rgba(200,168,75,0.12);
-  z-index: 50;
-  pointer-events: none;
-  opacity: 0;
-  transition: opacity 0.3s;
-}
-#quest-flash.pop {
-  animation: flashPop 0.6s ease-out forwards;
-}
-@keyframes flashPop {
-  0%   { opacity: 1; }
-  100% { opacity: 0; }
-}
-
-/* ─── Start Screen ───────────────────────────────────── */
-#start-screen {
-  position: fixed;
-  inset: 0;
-  background: #0a0008;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  gap: 20px;
-  z-index: 100;
-}
-
-#start-screen h1 {
-  font-family: 'Cinzel', serif;
-  font-size: clamp(32px, 10vw, 64px);
-  color: var(--gold);
-  letter-spacing: 6px;
-  text-shadow: 0 0 30px rgba(200,168,75,0.4);
-}
-
-#start-screen p {
-  font-style: italic;
-  color: rgba(200,168,75,0.5);
-  font-size: 13px;
-  letter-spacing: 2px;
-}
-
-#btn-start {
-  margin-top: 8px;
-  font-family: 'Cinzel', serif;
-  font-size: 12px;
-  letter-spacing: 4px;
-  color: var(--gold);
-  background: none;
-  border: 1px solid rgba(200,168,75,0.5);
-  padding: 14px 40px;
-  cursor: pointer;
-  transition: all 0.2s;
-  text-transform: uppercase;
-}
-#btn-start:hover {
-  background: rgba(200,168,75,0.1);
-  border-color: var(--gold);
-}
-
-#loading-bar-wrap {
-  display: none;
-  flex-direction: column;
-  align-items: center;
-  gap: 10px;
-}
-#loading-bar-wrap p {
-  font-family: 'Cinzel', serif;
-  font-size: 10px;
-  letter-spacing: 3px;
-  color: rgba(200,168,75,0.6);
-}
-#loading-bar {
-  width: 180px; height: 2px;
-  background: rgba(200,168,75,0.15);
-  overflow: hidden;
-}
-#loading-bar-inner {
-  height: 100%;
-  background: var(--gold);
-  box-shadow: 0 0 8px var(--gold);
-  animation: loadAnim 3s ease-out forwards;
-}
-@keyframes loadAnim { 0%{width:0%} 100%{width:100%} }
-</style>
+    .diag-zone {
+      flex-shrink: 0;
+      border: 1px solid var(--border);
+      background: var(--cream);
+      display: flex;
+      min-height: 128px;
+      max-height: 158px;
+      cursor: pointer;
+      user-select: none;
+    }
+    .profile-col {
+      width: 108px;
+      flex-shrink: 0;
+      border-right: 1px solid var(--border);
+      background: var(--sky);
+      overflow: hidden;
+    }
+    .profile-col img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      display: block;
+    }
+    .diag-inner {
+      flex: 1;
+      padding: 13px 14px 10px;
+      display: flex;
+      flex-direction: column;
+      gap: 5px;
+      min-width: 0;
+    }
+    #speakerName {
+      font-size: 8px;
+      letter-spacing: 3px;
+      color: var(--sky-deep);
+      opacity: 0.7;
+    }
+    #dialogueText {
+      font-size: 11px;
+      letter-spacing: 0.4px;
+      line-height: 1.8;
+      color: var(--ink);
+      flex: 1;
+    }
+    .tap-cue {
+      font-size: 8px;
+      letter-spacing: 2px;
+      color: var(--ink);
+      opacity: 0.22;
+      text-align: right;
+    }
+  </style>
 </head>
 <body>
 
-<!-- ═══════════════════════════════════════════════
-     ✦  QUEST SCRIPT — Edit freely below  ✦
-     Each quest: {
-       target:   COCO-SSD class name (see list in README comment below)
-       holdSecs: seconds to hold object in frame (1–5 recommended)
-       dialogue: array of strings — lines spoken before the quest
-       found:    array of strings — lines spoken when quest completes
-     }
-     After all quests, endDialogue plays.
-═══════════════════════════════════════════════ -->
-<!--
-  Common COCO-SSD object names you can use as targets:
-  person, chair, couch, potted plant, bed, dining table, tv, laptop,
-  mouse, keyboard, cell phone, book, clock, vase, cup, bottle, bowl,
-  apple, orange, banana, sandwich, pizza, cake, backpack, umbrella,
-  handbag, tie, suitcase, sports ball, scissors, teddy bear, remote
--->
-<script>
-const NARRATOR_NAME = "Elara";  // ← change this to your character's name
-
-const QUESTS = [
-  {
-    target:   "cell phone",
-    holdSecs: 2,
-    dialogue: [
-      "Ah... you've finally arrived.",
-      "The signal I sent — did it reach you? Good.",
-      "I need you to prove yourself before I trust you further.",
-      "Find me a communication device. A phone. Hold it steady so I can see it."
-    ],
-    found: [
-      "Yes... there it is.",
-      "So you do know how to follow instructions.",
-      "Keep it. You may need it later."
-    ]
-  },
-  {
-    target:   "book",
-    holdSecs: 3,
-    dialogue: [
-      "There is knowledge scattered in this world that I cannot reach myself.",
-      "Somewhere near you — a book. An old one, perhaps, or perhaps not.",
-      "It doesn't matter which. Bring it into frame and hold it still.",
-      "I'll know when you've found the right one."
-    ],
-    found: [
-      "...",
-      "That's the one.",
-      "I can feel it from here. The pages remember things we've forgotten.",
-      "You're more capable than I expected."
-    ]
-  },
-  {
-    target:   "cup",
-    holdSecs: 2,
-    dialogue: [
-      "One last thing. A small thing.",
-      "Show me something ordinary. Something you drink from.",
-      "Humility is a virtue, you know."
-    ],
-    found: [
-      "Ha. A cup.",
-      "Perfect.",
-      "You've passed. All three trials.",
-      "Come back when the stars look different. I'll have more for you."
-    ]
-  }
-];
-
-const END_DIALOGUE = [
-  "That's all for now.",
-  "The world is still watching, even when you're not looking.",
-  "Until we meet again..."
-];
-</script>
-
-<!-- ═══════════════════════════════════════════════ -->
-
-<!-- Camera Layer -->
-<div id="camera-layer">
-  <video id="video" autoplay muted playsinline></video>
-  <canvas id="detect-canvas"></canvas>
-</div>
-
-<!-- Quest HUD -->
-<div id="quest-hud">
-  <div id="quest-icon">◈</div>
-  <div id="quest-text">
-    SEEKING: <span id="hud-target">—</span>
+<!-- ════ TITLE ════ -->
+<div class="screen active" id="s-title">
+  <div class="layout">
+    <div class="tex"><img src="img/texture.png" alt=""></div>
+    <div class="click-bar" id="clickBar"><strong>CLICK</strong>&ensp;<small>ANYWHERE TO START</small></div>
+    <div class="title-mid">
+      <div class="alt-tag">Alternative Reality</div>
+      <div class="big-title">KARDIA</div>
+      <div class="on-row"><span>ON</span></div>
+      <div class="big-title">PHONE</div>
+    </div>
+    <div class="tex flip"><img src="img/texture.png" alt=""></div>
   </div>
 </div>
 
-<!-- Capture ring -->
-<div id="capture-wrap">
-  <div id="capture-ring">
-    <svg viewBox="0 0 100 100">
-      <circle class="track" cx="50" cy="50" r="45"/>
-      <circle class="fill"  cx="50" cy="50" r="45" id="ring-fill"/>
-    </svg>
-    <div id="capture-label">
-      HOLD<div class="obj-name" id="ring-obj-name"></div>
+<!-- ════ LOADING ════ -->
+<div class="screen" id="s-loading">
+  <div class="layout">
+    <div class="tex"><img src="img/texture.png" alt=""></div>
+    <div class="spacer"></div>
+    <div class="loading-mid">
+      <svg id="compassSvg" width="138" height="138" viewBox="0 0 140 140"
+           fill="none" xmlns="http://www.w3.org/2000/svg">
+        <circle cx="70" cy="70" r="64" stroke="#6aa0c4" stroke-width="1.2"
+                stroke-dasharray="3.5 3.5" opacity="0.62"/>
+        <circle cx="70" cy="70" r="52" stroke="#6aa0c4" stroke-width="0.8" opacity="0.38"/>
+        <g stroke="#6aa0c4" stroke-width="1.4" opacity="0.88">
+          <line x1="70" y1="18" x2="70" y2="62"/>
+          <line x1="70" y1="78" x2="70" y2="122"/>
+          <line x1="18" y1="70" x2="62" y2="70"/>
+          <line x1="78" y1="70" x2="122" y2="70"/>
+          <line x1="25.4" y1="25.4" x2="57.6" y2="57.6"/>
+          <line x1="82.4" y1="82.4" x2="114.6" y2="114.6"/>
+          <line x1="114.6" y1="25.4" x2="82.4" y2="57.6"/>
+          <line x1="57.6" y1="82.4" x2="25.4" y2="114.6"/>
+        </g>
+        <g stroke="#6aa0c4" stroke-width="0.9" opacity="0.48">
+          <line x1="46.2" y1="20.0" x2="61.5" y2="63.5"/>
+          <line x1="93.8" y1="20.0" x2="78.5" y2="63.5"/>
+          <line x1="120.0" y1="46.2" x2="76.5" y2="61.5"/>
+          <line x1="120.0" y1="93.8" x2="76.5" y2="78.5"/>
+          <line x1="93.8" y1="120.0" x2="78.5" y2="76.5"/>
+          <line x1="46.2" y1="120.0" x2="61.5" y2="76.5"/>
+          <line x1="20.0" y1="93.8" x2="63.5" y2="78.5"/>
+          <line x1="20.0" y1="46.2" x2="63.5" y2="61.5"/>
+        </g>
+        <circle cx="70" cy="70" r="9" stroke="#6aa0c4" stroke-width="0.8" opacity="0.38"/>
+        <circle cx="70" cy="70" r="4" fill="#6aa0c4" opacity="0.78"/>
+      </svg>
+      <div class="load-lbl">Loading..</div>
     </div>
+    <div class="tex flip"><img src="img/texture.png" alt=""></div>
   </div>
 </div>
 
-<!-- Dialogue Box -->
-<div id="dialogue-wrap">
-  <div id="dialogue-box">
-    <div id="scroll-tab"></div>
-    <div class="ornament tr">❧</div>
-    <div class="ornament bl">❧</div>
-
-    <div id="portrait-wrap">
-      <img id="portrait-img" src="./img/profile.jpg" alt="narrator">
-      <div id="portrait-name"></div>
+<!-- ════ GAME ════ -->
+<div class="screen" id="s-game">
+  <div class="layout">
+    <div class="quest-zone">
+      <div class="quest-eyebrow">QUEST OBJECTIVE</div>
+      <div id="questText">Awaiting signal…</div>
     </div>
-
-    <div id="dialogue-inner">
-      <div id="dialogue-text"><span class="cursor"></span></div>
-      <div id="dialogue-actions">
-        <button id="btn-next">NEXT ▶</button>
+    <div class="chapter-strip" id="chapterBar">CHAPTER 1 : The Beginnings</div>
+    <div class="cam-zone">
+      <video id="video" autoplay muted playsinline></video>
+      <canvas id="canvas"></canvas>
+      <div id="holdLabel">HOLD STEADY…</div>
+    </div>
+    <div class="diag-zone" id="diagBox">
+      <div class="profile-col"><img src="img/profile.jpg" alt="Kardia"></div>
+      <div class="diag-inner">
+        <div id="speakerName">KARDIA</div>
+        <div id="dialogueText">…</div>
+        <div class="tap-cue">TAP TO CONTINUE</div>
       </div>
     </div>
-  </div>
-</div>
-
-<!-- Quest complete flash -->
-<div id="quest-flash"></div>
-
-<!-- Start Screen -->
-<div id="start-screen">
-  <h1>AR QUEST</h1>
-  <p>A world that watches back</p>
-  <button id="btn-start">Begin</button>
-  <div id="loading-bar-wrap">
-    <p id="loading-msg">AWAKENING...</p>
-    <div id="loading-bar"><div id="loading-bar-inner"></div></div>
   </div>
 </div>
 
 <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@4.17.0/dist/tf.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@tensorflow-models/coco-ssd@2.2.3/dist/coco-ssd.min.js"></script>
 <script>
-// ─── DOM refs ────────────────────────────────────────────
-const video        = document.getElementById('video');
-const detectCanvas = document.getElementById('detect-canvas');
-const dctx         = detectCanvas.getContext('2d');
+// ══════════════════════════════════════════
+//  STORY — edit this to write your narrative
+// ══════════════════════════════════════════
+const STORY = [
+  {
+    chapter: "CHAPTER 1 : The Beginnings",
+    quest:   "Something familiar lingers near you.\nFind a bottle.",
+    target:  "bottle",
+    holdSec: 2.5,
+    intro: [
+      "You've arrived at last.",
+      "The world looks the same to you. It isn't.",
+      "Find me a bottle. Hold it in view."
+    ],
+    capture: [
+      "There. You felt it, didn't you?",
+      "The first seal breaks quietly.",
+      "Follow me further."
+    ]
+  },
+  {
+    chapter: "CHAPTER 2 : The Witness",
+    quest:   "Someone nearby holds a piece of this story.\nFind a person.",
+    target:  "person",
+    holdSec: 3,
+    intro: [
+      "You are not alone in this.",
+      "There is someone close to you right now.",
+      "Find them. Hold them in your sight."
+    ],
+    capture: [
+      "They carry something they don't know about.",
+      "A thread. Barely visible.",
+      "We must keep moving."
+    ]
+  },
+  {
+    chapter: "CHAPTER 3 : The Vessel",
+    quest:   "Warmth is the next clue.\nFind a cup.",
+    target:  "cup",
+    holdSec: 2.5,
+    intro: [
+      "Something small. Something held.",
+      "A cup is never just a cup.",
+      "Find one. Let it linger in your frame."
+    ],
+    capture: [
+      "Yes. That warmth you felt.",
+      "It belongs to this story.",
+      "You are closer than you think."
+    ]
+  }
+];
 
-const questHud     = document.getElementById('quest-hud');
-const hudTarget    = document.getElementById('hud-target');
+// ══════════════════════════════════════════
+//  STATE
+// ══════════════════════════════════════════
+let model       = null;
+let chapter     = 0;
+let introIdx    = 0;
+let isCapturing = false;
+let holdStart   = null;
+let typeTimer   = null;
 
-const captureWrap  = document.getElementById('capture-wrap');
-const ringFill     = document.getElementById('ring-fill');
-const ringObjName  = document.getElementById('ring-obj-name');
+const video     = document.getElementById('video');
+const canvas    = document.getElementById('canvas');
+const ctx       = canvas.getContext('2d');
+const questEl   = document.getElementById('questText');
+const chapterEl = document.getElementById('chapterBar');
+const diagEl    = document.getElementById('dialogueText');
+const speakerEl = document.getElementById('speakerName');
+const diagBox   = document.getElementById('diagBox');
+const holdLabel = document.getElementById('holdLabel');
 
-const dialogueWrap = document.getElementById('dialogue-wrap');
-const dialogueText = document.getElementById('dialogue-text');
-const btnNext      = document.getElementById('btn-next');
-const portraitName = document.getElementById('portrait-name');
-const questFlash   = document.getElementById('quest-flash');
+// ══════════════════════════════════════════
+//  SCREEN TRANSITIONS
+// ══════════════════════════════════════════
+function showScreen(id) {
+  document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+  document.getElementById(id).classList.add('active');
+}
 
-const startScreen  = document.getElementById('start-screen');
-const btnStart     = document.getElementById('btn-start');
-const loadingWrap  = document.getElementById('loading-bar-wrap');
-const loadingMsg   = document.getElementById('loading-msg');
+document.getElementById('s-title').addEventListener('click', boot);
 
-// ─── State ───────────────────────────────────────────────
-let model          = null;
-let questIndex     = 0;
-let dialogueIndex  = 0;
-let inDialogue     = false;
-let waitingCapture = false;
-let captureStart   = null;
-let captureTarget  = null;
-let typeTimer      = null;
-let detecting      = false;
-let phase          = 'intro'; // 'intro' | 'quest' | 'found' | 'end'
-
-const CIRCUMFERENCE = 2 * Math.PI * 45; // matches r=45
-
-// ─── Init ────────────────────────────────────────────────
-portraitName.textContent = NARRATOR_NAME;
-
-btnStart.addEventListener('click', async () => {
-  btnStart.style.display = 'none';
-  loadingWrap.style.display = 'flex';
-
+async function boot() {
+  showScreen('s-loading');
   try {
     const stream = await navigator.mediaDevices.getUserMedia({
-      video: { facingMode: 'environment', width:{ideal:1280}, height:{ideal:720} }
+      video: { facingMode: 'environment', width: { ideal: 1280 }, height: { ideal: 720 } }
     });
     video.srcObject = stream;
     await video.play();
-    loadingMsg.textContent = 'LOADING MODEL...';
     model = await cocoSsd.load({ base: 'mobilenet_v2' });
-    loadingMsg.textContent = 'READY';
-    setTimeout(() => {
-      startScreen.style.display = 'none';
-      resizeCanvas();
-      startQuest(0);
-      detectLoop();
-    }, 600);
+    resizeCanvas();
+    loadChapter(0);
+    showScreen('s-game');
+    detect();
   } catch(e) {
-    loadingMsg.textContent = 'ERROR: ' + e.message;
-    loadingMsg.style.color = '#ff4444';
+    document.querySelector('#s-loading .load-lbl').textContent = 'Camera error.';
+    console.error(e);
   }
+}
+
+// ══════════════════════════════════════════
+//  CHAPTER & DIALOGUE
+// ══════════════════════════════════════════
+function loadChapter(i) {
+  chapter     = i;
+  introIdx    = 0;
+  isCapturing = false;
+  holdStart   = null;
+  holdLabel.classList.remove('show');
+  const ch = STORY[i];
+  chapterEl.textContent = ch.chapter;
+  questEl.textContent   = ch.quest;
+  type(ch.intro[0]);
+}
+
+function type(text, speaker = 'KARDIA') {
+  if (typeTimer) clearInterval(typeTimer);
+  speakerEl.textContent = speaker;
+  diagEl.textContent    = '';
+  let i = 0;
+  typeTimer = setInterval(() => {
+    diagEl.textContent += text[i++];
+    if (i >= text.length) clearInterval(typeTimer);
+  }, 38);
+}
+
+// Tap dialogue to advance intro lines
+diagBox.addEventListener('click', () => {
+  if (isCapturing) return;
+  const next = Math.min(introIdx + 1, STORY[chapter].intro.length - 1);
+  if (next !== introIdx) { introIdx = next; type(STORY[chapter].intro[introIdx]); }
 });
 
-// ─── Canvas resize ───────────────────────────────────────
+// ══════════════════════════════════════════
+//  CANVAS
+// ══════════════════════════════════════════
 function resizeCanvas() {
-  detectCanvas.width  = window.innerWidth;
-  detectCanvas.height = window.innerHeight;
+  canvas.width  = canvas.offsetWidth;
+  canvas.height = canvas.offsetHeight;
 }
 window.addEventListener('resize', resizeCanvas);
 
-// ─── Quest flow ──────────────────────────────────────────
-function startQuest(idx) {
-  questIndex    = idx;
-  dialogueIndex = 0;
-  phase = 'intro';
-
-  if (idx >= QUESTS.length) {
-    // All quests done — play end dialogue
-    phase = 'end';
-    questHud.classList.remove('visible');
-    showDialogue(END_DIALOGUE);
-    return;
-  }
-
-  const q = QUESTS[idx];
-  hudTarget.innerHTML = q.target.toUpperCase();
-  hudTarget.nextElementSibling && (hudTarget.nextElementSibling.textContent = 'Hold for ' + q.holdSecs + 's');
-
-  showDialogue(q.dialogue, () => {
-    // After intro dialogue, activate quest
-    phase = 'quest';
-    waitingCapture = true;
-    captureTarget  = q.target;
-    questHud.classList.add('visible');
-
-    const span = document.createElement('span');
-    span.textContent = `Hold for ${q.holdSecs}s`;
-    hudTarget.parentNode.appendChild(span);
-  });
-}
-
-// ─── Dialogue system ─────────────────────────────────────
-let dialogueLines    = [];
-let onDialogueDone   = null;
-let currentLineIdx   = 0;
-let typing           = false;
-
-function showDialogue(lines, onDone) {
-  dialogueLines  = lines;
-  onDialogueDone = onDone || null;
-  currentLineIdx = 0;
-  inDialogue     = true;
-  dialogueWrap.classList.add('open');
-  btnNext.style.display = 'block';
-  typeLine(dialogueLines[0]);
-}
-
-function typeLine(line) {
-  clearTimeout(typeTimer);
-  typing = true;
-  dialogueText.innerHTML = '';
-  let i = 0;
-  const cursor = document.createElement('span');
-  cursor.className = 'cursor';
-
-  function tick() {
-    if (i < line.length) {
-      dialogueText.textContent = line.slice(0, ++i);
-      dialogueText.appendChild(cursor);
-      typeTimer = setTimeout(tick, 28);
-    } else {
-      typing = false;
-    }
-  }
-  tick();
-}
-
-btnNext.addEventListener('click', () => {
-  if (typing) {
-    // Skip to end of current line
-    clearTimeout(typeTimer);
-    typing = false;
-    dialogueText.textContent = dialogueLines[currentLineIdx];
-    return;
-  }
-
-  currentLineIdx++;
-  if (currentLineIdx < dialogueLines.length) {
-    typeLine(dialogueLines[currentLineIdx]);
-  } else {
-    // Dialogue finished
-    dialogueWrap.classList.remove('open');
-    inDialogue = false;
-    dialogueText.innerHTML = '<span class="cursor"></span>';
-    if (onDialogueDone) onDialogueDone();
-  }
-});
-
-// ─── Detection loop ──────────────────────────────────────
-async function detectLoop() {
-  if (!model || video.readyState < 2) {
-    requestAnimationFrame(detectLoop);
-    return;
-  }
+// ══════════════════════════════════════════
+//  DETECT LOOP
+// ══════════════════════════════════════════
+async function detect() {
+  requestAnimationFrame(detect);
+  if (!model || video.readyState < 2) return;
+  resizeCanvas();
 
   const preds = await model.detect(video);
-  drawDetections(preds);
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-  // Quest capture logic
-  if (waitingCapture && captureTarget && !inDialogue) {
-    const hit = preds.find(p =>
-      p.class === captureTarget && p.score > 0.45
-    );
+  const ch  = STORY[chapter];
+  const hit = preds.find(p => p.class === ch.target && p.score > 0.45);
 
-    if (hit) {
-      if (!captureStart) captureStart = performance.now();
-      const elapsed  = (performance.now() - captureStart) / 1000;
-      const required = QUESTS[questIndex].holdSecs;
-      const progress = Math.min(elapsed / required, 1);
+  preds.forEach(p => drawBox(p, p.class === ch.target));
 
-      // Update ring
-      ringFill.style.strokeDashoffset = CIRCUMFERENCE * (1 - progress);
-      ringObjName.textContent = captureTarget;
-      captureWrap.classList.add('active');
+  if (isCapturing) return;
 
-      if (progress >= 1) {
-        // ✓ Captured!
-        onObjectCaptured();
-      }
-    } else {
-      // Reset if lost
-      captureStart = null;
-      ringFill.style.strokeDashoffset = CIRCUMFERENCE;
-      captureWrap.classList.remove('active');
-    }
+  if (hit) {
+    if (!holdStart) holdStart = performance.now();
+    const prog = Math.min((performance.now() - holdStart) / (ch.holdSec * 1000), 1);
+    holdLabel.classList.add('show');
+    drawArc(hit, prog);
+    if (prog >= 1) triggerCapture(ch);
+  } else {
+    holdStart = null;
+    holdLabel.classList.remove('show');
   }
-
-  requestAnimationFrame(detectLoop);
 }
 
-function onObjectCaptured() {
-  waitingCapture = false;
-  captureStart   = null;
-  captureWrap.classList.remove('active');
-  questHud.classList.remove('visible');
+// ══════════════════════════════════════════
+//  CAPTURE SEQUENCE
+// ══════════════════════════════════════════
+function triggerCapture(ch) {
+  isCapturing = true;
+  holdLabel.classList.remove('show');
+  questEl.textContent = '✦  CAPTURED';
+  let i = 0;
+  type(ch.capture[0]);
+  const iv = setInterval(() => {
+    i++;
+    if (i < ch.capture.length) {
+      type(ch.capture[i]);
+    } else {
+      clearInterval(iv);
+      setTimeout(() => {
+        if (chapter + 1 < STORY.length) {
+          loadChapter(chapter + 1);
+        } else {
+          chapterEl.textContent = '— FIN —';
+          questEl.textContent   = 'You have seen everything there is to see.';
+          type('This is where the story rests.\nFor now.');
+        }
+      }, 2800);
+    }
+  }, 2800);
+}
 
-  // Flash
-  questFlash.classList.remove('pop');
-  void questFlash.offsetWidth;
-  questFlash.classList.add('pop');
+// ══════════════════════════════════════════
+//  DRAWING
+// ══════════════════════════════════════════
+function project(bbox) {
+  const [x, y, w, h] = bbox;
+  const s    = Math.max(canvas.width / video.videoWidth, canvas.height / video.videoHeight);
+  const offX = (canvas.width  - video.videoWidth  * s) / 2;
+  const offY = (canvas.height - video.videoHeight * s) / 2;
+  return { x: x*s+offX, y: y*s+offY, w: w*s, h: h*s };
+}
 
-  const q = QUESTS[questIndex];
-  phase = 'found';
-  showDialogue(q.found, () => {
-    // Advance to next quest
-    startQuest(questIndex + 1);
+function drawBox(pred, isTarget) {
+  const { x, y, w, h } = project(pred.bbox);
+  const col  = isTarget ? '#6aa0c4' : 'rgba(106,160,196,0.2)';
+  const tick = isTarget ? 14 : 7;
+
+  ctx.strokeStyle = col;
+  ctx.lineWidth   = isTarget ? 1.8 : 0.9;
+  ctx.shadowColor = col;
+  ctx.shadowBlur  = isTarget ? 8 : 0;
+
+  [[x,y,1,1],[x+w,y,-1,1],[x,y+h,1,-1],[x+w,y+h,-1,-1]].forEach(([cx,cy,dx,dy]) => {
+    ctx.beginPath();
+    ctx.moveTo(cx + dx*tick, cy);
+    ctx.lineTo(cx, cy);
+    ctx.lineTo(cx, cy + dy*tick);
+    ctx.stroke();
   });
+
+  if (isTarget) {
+    ctx.shadowBlur = 0;
+    ctx.font = '10px monospace';
+    ctx.fillStyle = col;
+    ctx.fillText(`${pred.class.toUpperCase()}  ${Math.round(pred.score*100)}%`, x+6, y-7);
+  }
+  ctx.shadowBlur = 0;
 }
 
-// ─── Draw detections ─────────────────────────────────────
-const COLORS = ['#c8a84b','#a890d8','#6eb8c0','#d8886e','#88b86e','#c06eb8'];
-const classColor = {};
-let colorIdx = 0;
+function drawArc(pred, progress) {
+  const { x, y, w, h } = project(pred.bbox);
+  const cx = x + w/2, cy = y + h/2;
+  const r  = Math.max(w, h) * 0.56;
 
-function getColor(cls) {
-  if (!classColor[cls]) classColor[cls] = COLORS[colorIdx++ % COLORS.length];
-  return classColor[cls];
-}
+  ctx.beginPath();
+  ctx.arc(cx, cy, r, 0, Math.PI*2);
+  ctx.strokeStyle = 'rgba(106,160,196,0.18)';
+  ctx.lineWidth   = 3;
+  ctx.stroke();
 
-function drawDetections(preds) {
-  dctx.clearRect(0, 0, detectCanvas.width, detectCanvas.height);
-
-  preds.forEach(p => {
-    const [x,y,w,h] = p.bbox;
-    const sx = Math.max(
-      detectCanvas.width  / video.videoWidth,
-      detectCanvas.height / video.videoHeight
-    );
-    const ox = (detectCanvas.width  - video.videoWidth  * sx) / 2;
-    const oy = (detectCanvas.height - video.videoHeight * sx) / 2;
-    const rx = x*sx+ox, ry = y*sx+oy, rw = w*sx, rh = h*sx;
-
-    const isTarget = waitingCapture && p.class === captureTarget && p.score > 0.45;
-    const col = isTarget ? '#c8a84b' : getColor(p.class);
-
-    dctx.shadowColor = col;
-    dctx.shadowBlur  = isTarget ? 20 : 8;
-    dctx.strokeStyle = col;
-    dctx.lineWidth   = isTarget ? 2.5 : 1.5;
-    dctx.strokeRect(rx, ry, rw, rh);
-
-    // Corner ticks
-    const t = 14;
-    dctx.lineWidth = isTarget ? 3.5 : 2.5;
-    [[rx,ry,1,1],[rx+rw,ry,-1,1],[rx,ry+rh,1,-1],[rx+rw,ry+rh,-1,-1]].forEach(([cx,cy,dx,dy])=>{
-      dctx.beginPath();
-      dctx.moveTo(cx+dx*t, cy); dctx.lineTo(cx,cy); dctx.lineTo(cx,cy+dy*t);
-      dctx.stroke();
-    });
-    dctx.shadowBlur = 0;
-
-    // Label
-    const label = `${p.class}  ${Math.round(p.score*100)}%`;
-    const fs = Math.max(10, Math.min(13, rw/9));
-    dctx.font = `${fs}px 'IM Fell English', serif`;
-    const tw = dctx.measureText(label).width;
-    const lh = fs + 10;
-    const ly = ry - lh - 4 < 0 ? ry + 4 : ry - lh - 4;
-
-    dctx.fillStyle = col;
-    dctx.globalAlpha = 0.18;
-    dctx.fillRect(rx, ly, tw+16, lh);
-    dctx.globalAlpha = 1;
-    dctx.strokeStyle = col; dctx.lineWidth = 1;
-    dctx.shadowColor = col; dctx.shadowBlur = 6;
-    dctx.strokeRect(rx, ly, tw+16, lh);
-    dctx.shadowBlur = 0;
-    dctx.fillStyle = '#ffffffee';
-    dctx.fillText(label, rx+8, ly+fs+3);
-  });
+  ctx.beginPath();
+  ctx.arc(cx, cy, r, -Math.PI/2, -Math.PI/2 + Math.PI*2*progress);
+  ctx.strokeStyle = '#6aa0c4';
+  ctx.lineWidth   = 3;
+  ctx.shadowColor = '#6aa0c4';
+  ctx.shadowBlur  = 14;
+  ctx.stroke();
+  ctx.shadowBlur  = 0;
 }
 </script>
 </body>
