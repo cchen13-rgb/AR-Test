@@ -7,28 +7,34 @@
   <link rel="stylesheet" href="https://use.typekit.net/mjw2tfe.css">
   <style>
     :root {
-      --sky:      #b8d8ee;
-      --sky-mid:  #8fb8d8;
-      --sky-deep: #6aa0c4;
-      --cream:    #e8e2d6;
-      --cream-lt: #f2ede4;
-      --border:   rgba(90,140,175,0.42);
-      --ink:      #3d6080;
-      --ink-lt:   #6a90aa;
+      --blue:    #1f97dd;
+      --blue-dk: #19669a;
+      --border:  rgba(35, 113, 176, 0.55);
+      --ink:     #124570;
+      --pink:    #b07a8a;
     }
 
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
     html, body { height: 100%; overflow: hidden; }
 
     body {
-      font-family: "fayte-pixel", monospace;
-      background: linear-gradient(180deg, #aacee8 0%, #c8dff2 50%, #b8cede 100%);
+      font-family: "cofo-sans-pixel", sans-serif;
+      background: transparent;
       display: flex;
       align-items: center;
       justify-content: center;
     }
 
-    /* ── SCREEN SYSTEM ── */
+    #bg-canvas {
+      position: fixed;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+      z-index: -1;
+      image-rendering: pixelated;
+    }
+
+    /* ── SCREENS ── */
     .screen {
       position: fixed;
       inset: 0;
@@ -47,16 +53,20 @@
       height: 100dvh;
       display: flex;
       flex-direction: column;
-      overflow: hidden;
+    }
+
+    /* All panels: light opaque bg so text stays legible over dithered background */
+    .panel {
+      border: 1px solid var(--border);
+      background: rgba(239, 248, 255, 0.92);
     }
 
     /* ── TEXTURE PANELS ── */
     .tex {
       flex-shrink: 0;
-      height: 26vh;
-      max-height: 185px;
+      height: 27vh;
+      max-height: 200px;
       border: 1px solid var(--border);
-      background: var(--cream-lt);
       overflow: hidden;
     }
     .tex img {
@@ -64,18 +74,12 @@
       height: 100%;
       object-fit: cover;
       display: block;
-      opacity: 0.52;
-      mix-blend-mode: multiply;
     }
     .tex.flip { transform: scaleY(-1); }
 
-    /* ════════════════════
-       TITLE SCREEN
-    ════════════════════ */
+    /* ══ TITLE ══ */
     .click-bar {
       flex-shrink: 0;
-      border: 1px solid var(--border);
-      background: var(--cream-lt);
       padding: 14px 20px;
       text-align: center;
       font-size: 11px;
@@ -83,72 +87,72 @@
       color: var(--ink);
       cursor: pointer;
       user-select: none;
-      transition: background 0.18s;
     }
-    .click-bar:hover { background: var(--cream); }
-    .click-bar strong { font-size: 15px; letter-spacing: 1px; }
+    .click-bar strong {
+      font-family: "fayte-pixel-hard", sans-serif;
+      font-size: 15px;
+    }
 
     .title-mid {
       flex: 1;
-      border: 1px solid var(--border);
-      background: var(--cream);
       display: flex;
       flex-direction: column;
       align-items: center;
       justify-content: center;
       padding: 28px 20px;
-      gap: 2px;
     }
 
     .alt-tag {
+      font-family: "fayte-pixel-hard", sans-serif;
       font-size: 9px;
       letter-spacing: 5px;
-      color: var(--ink-lt);
-      opacity: 0.55;
+      color: var(--ink);
+      opacity: 0.5;
       text-transform: uppercase;
-      margin-bottom: 14px;
+      margin-bottom: 16px;
     }
 
     .big-title {
-      font-family: "fayte-pixel", monospace;
-      font-size: clamp(58px, 18.5vw, 90px);
+      font-family: "fayte-pixel-hard", sans-serif;
+      font-size: clamp(60px, 19vw, 92px);
       line-height: 0.88;
-      color: var(--sky-mid);
+      color: var(--blue);
       text-transform: uppercase;
-      text-shadow: 3px 3px 0 rgba(61,96,128,0.15);
+      
     }
 
     .on-row {
       display: flex;
       align-items: center;
-      gap: 14px;
-      padding: 10px 0;
+      gap: 12px;
+      padding: 12px 0;
       width: 100%;
       justify-content: center;
     }
-    .on-row span { font-size: 11px; letter-spacing: 6px; color: var(--ink-lt); opacity: 0.5; }
+    .on-row span {
+      font-family: "fayte-pixel-hard", sans-serif;
+      font-size: 11px;
+      letter-spacing: 6px;
+      color: var(--ink);
+      opacity: 0.5;
+    }
     .on-row::before, .on-row::after {
       content: '';
-      flex: 1; max-width: 72px;
+      flex: 1;
+      max-width: 80px;
       height: 1px;
-      background: var(--sky-deep);
-      opacity: 0.28;
+      background: var(--ink);
+      opacity: 0.2;
     }
 
-    /* ════════════════════
-       LOADING SCREEN
-    ════════════════════ */
+    /* ══ LOADING ══ */
     .spacer {
       flex-shrink: 0;
       height: 50px;
-      border: 1px solid var(--border);
-      background: var(--sky);
     }
 
     .loading-mid {
       flex: 1;
-      border: 1px solid var(--border);
-      background: var(--cream);
       display: flex;
       flex-direction: column;
       align-items: center;
@@ -165,50 +169,49 @@
     .load-lbl {
       font-size: 14px;
       letter-spacing: 4px;
-      color: var(--ink-lt);
+      color: var(--ink);
+      opacity: 0.6;
     }
 
-    /* ════════════════════
-       GAME SCREEN
-    ════════════════════ */
+    /* ══ GAME ══ */
     .quest-zone {
       flex-shrink: 0;
-      border: 1px solid var(--border);
-      background: var(--sky);
       padding: 13px 15px;
       min-height: 94px;
     }
     .quest-eyebrow {
       font-size: 8px;
       letter-spacing: 3px;
-      color: var(--ink);
-      opacity: 0.42;
+      color: var(--pink);
+      opacity: 0.8;
       margin-bottom: 7px;
     }
     #questText {
       font-size: 12px;
       letter-spacing: 1px;
-      color: var(--ink);
+      color: var(--pink);
       line-height: 1.75;
       white-space: pre-line;
     }
 
     .chapter-strip {
       flex-shrink: 0;
-      border: 1px solid var(--border);
-      background: var(--cream-lt);
       padding: 10px 16px;
       text-align: center;
+      font-family: "fayte-pixel-hard", sans-serif;
       font-size: 13px;
       letter-spacing: 2px;
       color: var(--ink);
+      transition: opacity 0.6s ease;
+    }
+    .chapter-strip.fade {
+      opacity: 0;
     }
 
     .cam-zone {
       flex: 1;
       min-height: 0;
       border: 1px solid var(--border);
-      background: var(--sky-mid);
       position: relative;
       overflow: hidden;
     }
@@ -231,25 +234,21 @@
       opacity: 0;
       pointer-events: none;
       transition: opacity 0.3s;
-      text-shadow: 0 0 10px var(--sky-deep);
+      text-shadow: 0 0 10px var(--blue);
     }
     #holdLabel.show { opacity: 0.9; }
 
     .diag-zone {
       flex-shrink: 0;
-      border: 1px solid var(--border);
-      background: var(--cream);
       display: flex;
       min-height: 128px;
       max-height: 158px;
       cursor: pointer;
-      user-select: none;
     }
     .profile-col {
       width: 108px;
       flex-shrink: 0;
       border-right: 1px solid var(--border);
-      background: var(--sky);
       overflow: hidden;
     }
     .profile-col img {
@@ -269,12 +268,11 @@
     #speakerName {
       font-size: 8px;
       letter-spacing: 3px;
-      color: var(--sky-deep);
+      color: var(--blue-dk);
       opacity: 0.7;
     }
     #dialogueText {
       font-size: 11px;
-      letter-spacing: 0.4px;
       line-height: 1.8;
       color: var(--ink);
       flex: 1;
@@ -286,16 +284,19 @@
       opacity: 0.22;
       text-align: right;
     }
+
   </style>
 </head>
 <body>
 
-<!-- ════ TITLE ════ -->
+<canvas id="bg-canvas"></canvas>
+
+<!-- TITLE -->
 <div class="screen active" id="s-title">
   <div class="layout">
     <div class="tex"><img src="img/texture.png" alt=""></div>
-    <div class="click-bar" id="clickBar"><strong>CLICK</strong>&ensp;<small>ANYWHERE TO START</small></div>
-    <div class="title-mid">
+    <div class="panel click-bar"><strong>CLICK</strong>&ensp;<small>ANYWHERE TO START</small></div>
+    <div class="panel title-mid">
       <div class="alt-tag">Alternative Reality</div>
       <div class="big-title">KARDIA</div>
       <div class="on-row"><span>ON</span></div>
@@ -305,61 +306,34 @@
   </div>
 </div>
 
-<!-- ════ LOADING ════ -->
+<!-- LOADING -->
 <div class="screen" id="s-loading">
   <div class="layout">
     <div class="tex"><img src="img/texture.png" alt=""></div>
-    <div class="spacer"></div>
-    <div class="loading-mid">
-      <svg id="compassSvg" width="138" height="138" viewBox="0 0 140 140"
-           fill="none" xmlns="http://www.w3.org/2000/svg">
-        <circle cx="70" cy="70" r="64" stroke="#6aa0c4" stroke-width="1.2"
-                stroke-dasharray="3.5 3.5" opacity="0.62"/>
-        <circle cx="70" cy="70" r="52" stroke="#6aa0c4" stroke-width="0.8" opacity="0.38"/>
-        <g stroke="#6aa0c4" stroke-width="1.4" opacity="0.88">
-          <line x1="70" y1="18" x2="70" y2="62"/>
-          <line x1="70" y1="78" x2="70" y2="122"/>
-          <line x1="18" y1="70" x2="62" y2="70"/>
-          <line x1="78" y1="70" x2="122" y2="70"/>
-          <line x1="25.4" y1="25.4" x2="57.6" y2="57.6"/>
-          <line x1="82.4" y1="82.4" x2="114.6" y2="114.6"/>
-          <line x1="114.6" y1="25.4" x2="82.4" y2="57.6"/>
-          <line x1="57.6" y1="82.4" x2="25.4" y2="114.6"/>
-        </g>
-        <g stroke="#6aa0c4" stroke-width="0.9" opacity="0.48">
-          <line x1="46.2" y1="20.0" x2="61.5" y2="63.5"/>
-          <line x1="93.8" y1="20.0" x2="78.5" y2="63.5"/>
-          <line x1="120.0" y1="46.2" x2="76.5" y2="61.5"/>
-          <line x1="120.0" y1="93.8" x2="76.5" y2="78.5"/>
-          <line x1="93.8" y1="120.0" x2="78.5" y2="76.5"/>
-          <line x1="46.2" y1="120.0" x2="61.5" y2="76.5"/>
-          <line x1="20.0" y1="93.8" x2="63.5" y2="78.5"/>
-          <line x1="20.0" y1="46.2" x2="63.5" y2="61.5"/>
-        </g>
-        <circle cx="70" cy="70" r="9" stroke="#6aa0c4" stroke-width="0.8" opacity="0.38"/>
-        <circle cx="70" cy="70" r="4" fill="#6aa0c4" opacity="0.78"/>
-      </svg>
+    <div class="panel spacer"></div>
+    <div class="panel loading-mid">
+      <img id="compassSvg" src="img/loading.png" width="138" height="138" alt="loading">
       <div class="load-lbl">Loading..</div>
     </div>
     <div class="tex flip"><img src="img/texture.png" alt=""></div>
   </div>
 </div>
 
-<!-- ════ GAME ════ -->
+<!-- GAME -->
 <div class="screen" id="s-game">
   <div class="layout">
-    <div class="quest-zone">
+    <div class="panel quest-zone">
       <div class="quest-eyebrow">QUEST OBJECTIVE</div>
       <div id="questText">Awaiting signal…</div>
     </div>
-    <div class="chapter-strip" id="chapterBar">CHAPTER 1 : The Beginnings</div>
+    <div class="panel chapter-strip" id="chapterBar">CHAPTER 1 : The Beginnings</div>
     <div class="cam-zone">
       <video id="video" autoplay muted playsinline></video>
       <canvas id="canvas"></canvas>
       <div id="holdLabel">HOLD STEADY…</div>
     </div>
-    <div class="diag-zone" id="diagBox">
-      <div class="profile-col"><img src="img/profile.jpg" alt="Kardia"></div>
+    <div class="panel diag-zone" id="diagBox">
+      <div class="profile-col"><img src="img/profile.jpg" alt=""></div>
       <div class="diag-inner">
         <div id="speakerName">KARDIA</div>
         <div id="dialogueText">…</div>
@@ -372,187 +346,361 @@
 <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@4.17.0/dist/tf.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@tensorflow-models/coco-ssd@2.2.3/dist/coco-ssd.min.js"></script>
 <script>
-// ══════════════════════════════════════════
-//  STORY — edit this to write your narrative
-// ══════════════════════════════════════════
 const STORY = [
   {
-    chapter: "CHAPTER 1 : The Beginnings",
-    quest:   "Something familiar lingers near you.\nFind a bottle.",
-    target:  "bottle",
+    chapter: "CHAPTER 1 : The Signal",
+    quest:   "Something is trying to reach you.\nFind a cell phone.",
+    target:  "cell phone",
     holdSec: 2.5,
-    intro: [
-      "You've arrived at last.",
-      "The world looks the same to you. It isn't.",
-      "Find me a bottle. Hold it in view."
-    ],
-    capture: [
-      "There. You felt it, didn't you?",
-      "The first seal breaks quietly.",
-      "Follow me further."
-    ]
+    intro:   ["Hello...Anyone there?", "I am glad you could make it here.", "Could I get some signal here? Would you mind putting your phone into view?"],
+    capture: ["Great! Thank you.", "...", "There. Did you feel any pulse?"]
   },
   {
-    chapter: "CHAPTER 2 : The Witness",
-    quest:   "Someone nearby holds a piece of this story.\nFind a person.",
-    target:  "person",
-    holdSec: 3,
-    intro: [
-      "You are not alone in this.",
-      "There is someone close to you right now.",
-      "Find them. Hold them in your sight."
-    ],
-    capture: [
-      "They carry something they don't know about.",
-      "A thread. Barely visible.",
-      "We must keep moving."
-    ]
+    chapter: "CHAPTER 2 : The Mark",
+    quest:   "A book as the guide?.\nFind a book.",
+    target:  "book",
+    holdSec: 2.5,
+    intro:   ["Concerning...", "The signal is not the best here..", "Why not try looking into a book for any information. Could you show it steady in your sight?"],
+    capture: ["Yes. That is the one!", "Where would I be without you!", "In the meantime I shall look into this..."]
   },
   {
     chapter: "CHAPTER 3 : The Vessel",
-    quest:   "Warmth is the next clue.\nFind a cup.",
+    quest:   "Quench my thirst.\nFind a cup.",
     target:  "cup",
     holdSec: 2.5,
-    intro: [
-      "Something small. Something held.",
-      "A cup is never just a cup.",
-      "Find one. Let it linger in your frame."
-    ],
-    capture: [
-      "Yes. That warmth you felt.",
-      "It belongs to this story.",
-      "You are closer than you think."
-    ]
+    intro:   ["Great seems we are on the right track.", "Phew.. though I am feeling quite thirsty", "Will you be so kind and share a cup of water with me?"],
+    capture: ["Yes. I am feeling much better", "We work well as a team", "Let us keep going!"]
   }
 ];
 
-// ══════════════════════════════════════════
-//  STATE
-// ══════════════════════════════════════════
-let model       = null;
-let chapter     = 0;
-let introIdx    = 0;
-let isCapturing = false;
-let holdStart   = null;
-let typeTimer   = null;
+let model = null, chapter = 0, introIdx = 0;
+let isCapturing = false, holdStart = null, typeTimer = null;
+let running = false; // guard against concurrent detect calls
 
 const video     = document.getElementById('video');
 const canvas    = document.getElementById('canvas');
 const ctx       = canvas.getContext('2d');
 const questEl   = document.getElementById('questText');
+
+// ── DITHER SETUP ──
+// Offscreen canvas for pixel-level processing
+const offscreen = document.createElement('canvas');
+const offCtx    = offscreen.getContext('2d', { willReadFrequently: true });
+
+// Scale factor — higher = more legible, less chunky
+const DITHER_SCALE = 0.42;
+
+// 4×4 Bayer ordered dither matrix (values 0–15)
+const BAYER = [
+   0,  8,  2, 10,
+  12,  4, 14,  6,
+   3, 11,  1,  9,
+  15,  7, 13,  5
+];
+
+// Two-tone palette — softened dark so contrast is readable not harsh
+const DARK  = [52,  95, 145];
+const LIGHT = [218, 238, 252];
+
+function applyDither() {
+  const w = Math.max(1, Math.floor(canvas.width  * DITHER_SCALE));
+  const h = Math.max(1, Math.floor(canvas.height * DITHER_SCALE));
+  if (offscreen.width !== w)  offscreen.width  = w;
+  if (offscreen.height !== h) offscreen.height = h;
+
+  // Replicate CSS object-fit:cover so the dithered frame isn't stretched
+  const vw = video.videoWidth, vh = video.videoHeight;
+  const scale = Math.max(w / vw, h / vh);
+  const sw = vw * scale, sh = vh * scale;
+  const ox = (w - sw) / 2, oy = (h - sh) / 2;
+  offCtx.drawImage(video, ox, oy, sw, sh);
+  const imgData = offCtx.getImageData(0, 0, w, h);
+  const d = imgData.data;
+
+  for (let y = 0; y < h; y++) {
+    for (let x = 0; x < w; x++) {
+      const i = (y * w + x) * 4;
+      // Perceptual luminance
+      const lum = 0.299 * d[i] + 0.587 * d[i+1] + 0.114 * d[i+2];
+      // Bayer threshold 0–255
+      const threshold = (BAYER[(y % 4) * 4 + (x % 4)] / 15) * 255;
+      const col = lum > threshold ? LIGHT : DARK;
+      d[i]   = col[0];
+      d[i+1] = col[1];
+      d[i+2] = col[2];
+      d[i+3] = 255;
+    }
+  }
+
+  offCtx.putImageData(imgData, 0, 0);
+
+  // Scale back up sharp (no smoothing = chunky pixels)
+  ctx.imageSmoothingEnabled = false;
+  ctx.drawImage(offscreen, 0, 0, canvas.width, canvas.height);
+}
+
+// ── VCR SWEEP EFFECT ──
+let vcrStart = null;
+const VCR_DURATION = 950;
+
+function triggerVCR() { vcrStart = performance.now(); }
+
+function drawVCR() {
+  if (!vcrStart) return;
+  const elapsed = performance.now() - vcrStart;
+  if (elapsed > VCR_DURATION) { vcrStart = null; return; }
+
+  const t = elapsed / VCR_DURATION;
+  const w = canvas.width, h = canvas.height;
+  ctx.save();
+
+  // ── Initial white flash ──
+  if (elapsed < 100) {
+    ctx.fillStyle = `rgba(255,255,255,${0.7 * (1 - elapsed / 100)})`;
+    ctx.fillRect(0, 0, w, h);
+    ctx.restore();
+    return;
+  }
+
+  // ── Bright scanline band sweeping down ──
+  const scanY = t * h;
+  const grad = ctx.createLinearGradient(0, scanY - 28, 0, scanY + 28);
+  grad.addColorStop(0,   'rgba(255,255,255,0)');
+  grad.addColorStop(0.3, 'rgba(218,238,252,0.55)');
+  grad.addColorStop(0.5, 'rgba(255,255,255,0.85)');
+  grad.addColorStop(0.7, 'rgba(218,238,252,0.55)');
+  grad.addColorStop(1,   'rgba(255,255,255,0)');
+  ctx.fillStyle = grad;
+  ctx.fillRect(0, scanY - 28, w, 56);
+
+  // ── Glitch lines — random horizontal slices with pink tint ──
+  const glitchCount = Math.floor(4 * (1 - t));
+  for (let i = 0; i < glitchCount; i++) {
+    const gy     = Math.random() * scanY;
+    const gh     = Math.random() * 3 + 1;
+    const offset = (Math.random() - 0.5) * 18;
+    ctx.fillStyle = `rgba(176,122,138,${Math.random() * 0.45})`;
+    ctx.fillRect(offset, gy, w, gh);
+  }
+
+  // ── Subtle blue overlay on already-scanned area ──
+  ctx.fillStyle = `rgba(126,192,232,${0.12 * (1 - t)})`;
+  ctx.fillRect(0, 0, w, scanY);
+
+  // ── Thin repeating scanlines on the whole frame ──
+  ctx.fillStyle = `rgba(0,0,0,${0.06 * (1 - t)})`;
+  for (let y = 0; y < h; y += 4) ctx.fillRect(0, y, w, 1);
+
+  ctx.restore();
+}
 const chapterEl = document.getElementById('chapterBar');
 const diagEl    = document.getElementById('dialogueText');
 const speakerEl = document.getElementById('speakerName');
-const diagBox   = document.getElementById('diagBox');
 const holdLabel = document.getElementById('holdLabel');
 
-// ══════════════════════════════════════════
-//  SCREEN TRANSITIONS
-// ══════════════════════════════════════════
+// ── DITHER BACKGROUND GRADIENT ──
+// Uses the gradient's own colour range: dark stop → light stop
+const BG_DARK  = [126, 192, 232]; // #7ec0e8
+const BG_LIGHT = [247, 252, 255]; // #f7fcff
+
+function ditherBackground() {
+  const bgCanvas = document.getElementById('bg-canvas');
+  const W = window.innerWidth, H = window.innerHeight;
+  const w = Math.max(1, Math.floor(W * DITHER_SCALE));
+  const h = Math.max(1, Math.floor(H * DITHER_SCALE));
+
+  // Draw the gradient at reduced resolution
+  const tmp = document.createElement('canvas');
+  tmp.width = w; tmp.height = h;
+  const tc = tmp.getContext('2d', { willReadFrequently: true });
+  const grad = tc.createLinearGradient(0, 0, 0, h);
+  grad.addColorStop(0,    '#7ec0e8');
+  grad.addColorStop(0.30, '#d5eaf6');
+  grad.addColorStop(0.65, '#eff8ff');
+  grad.addColorStop(1,    '#f7fcff');
+  tc.fillStyle = grad;
+  tc.fillRect(0, 0, w, h);
+
+  const imgData = tc.getImageData(0, 0, w, h);
+  const d = imgData.data;
+  for (let y = 0; y < h; y++) {
+    for (let x = 0; x < w; x++) {
+      const i = (y * w + x) * 4;
+      const lum = 0.299 * d[i] + 0.587 * d[i+1] + 0.114 * d[i+2];
+      const threshold = (BAYER[(y % 4) * 4 + (x % 4)] / 15) * 255;
+      const col = lum > threshold ? BG_LIGHT : BG_DARK;
+      d[i] = col[0]; d[i+1] = col[1]; d[i+2] = col[2]; d[i+3] = 255;
+    }
+  }
+  tc.putImageData(imgData, 0, 0);
+
+  // Scale up sharp to full screen
+  bgCanvas.width  = W;
+  bgCanvas.height = H;
+  const bc = bgCanvas.getContext('2d');
+  bc.imageSmoothingEnabled = false;
+  bc.drawImage(tmp, 0, 0, W, H);
+}
+
+window.addEventListener('load',   ditherBackground);
+window.addEventListener('resize', ditherBackground);
+
+// ── DITHER STATIC IMAGES ──
+function ditherImg(img) {
+  const c  = document.createElement('canvas');
+  c.width  = img.naturalWidth;
+  c.height = img.naturalHeight;
+  const cx = c.getContext('2d', { willReadFrequently: true });
+  cx.drawImage(img, 0, 0);
+  const imgData = cx.getImageData(0, 0, c.width, c.height);
+  const d = imgData.data;
+  for (let y = 0; y < c.height; y++) {
+    for (let x = 0; x < c.width; x++) {
+      const i = (y * c.width + x) * 4;
+      if (d[i+3] === 0) continue; // keep transparent pixels untouched
+      const lum = 0.299 * d[i] + 0.587 * d[i+1] + 0.114 * d[i+2];
+      const threshold = (BAYER[(y % 4) * 4 + (x % 4)] / 15) * 255;
+      const col = lum > threshold ? LIGHT : DARK;
+      d[i] = col[0]; d[i+1] = col[1]; d[i+2] = col[2];
+      // d[i+3] left as-is to preserve original alpha
+    }
+  }
+  cx.putImageData(imgData, 0, 0);
+  img.src = c.toDataURL();
+}
+
+window.addEventListener('load', () => {
+  document.querySelectorAll('img').forEach(img => {
+    if (img.complete && img.naturalWidth > 0) ditherImg(img);
+    else img.addEventListener('load', () => ditherImg(img));
+  });
+});
+
+// ── SCREENS ──
 function showScreen(id) {
   document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
   document.getElementById(id).classList.add('active');
 }
-
 document.getElementById('s-title').addEventListener('click', boot);
 
 async function boot() {
   showScreen('s-loading');
   try {
     const stream = await navigator.mediaDevices.getUserMedia({
-      video: { facingMode: 'environment', width: { ideal: 1280 }, height: { ideal: 720 } }
+      video: { facingMode: 'environment', width: { ideal: 1280 } }
     });
     video.srcObject = stream;
     await video.play();
+
+    // Load model
     model = await cocoSsd.load({ base: 'mobilenet_v2' });
+
     resizeCanvas();
     loadChapter(0);
     showScreen('s-game');
-    detect();
+
+    // Start the loop ONCE
+    loop();
   } catch(e) {
-    document.querySelector('#s-loading .load-lbl').textContent = 'Camera error.';
     console.error(e);
+    document.querySelector('#s-loading .load-lbl').textContent = 'Error: ' + e.message;
   }
 }
 
-// ══════════════════════════════════════════
-//  CHAPTER & DIALOGUE
-// ══════════════════════════════════════════
-function loadChapter(i) {
-  chapter     = i;
-  introIdx    = 0;
-  isCapturing = false;
-  holdStart   = null;
-  holdLabel.classList.remove('show');
-  const ch = STORY[i];
-  chapterEl.textContent = ch.chapter;
-  questEl.textContent   = ch.quest;
-  type(ch.intro[0]);
+// ── DETECT LOOP — rAF called at END so no concurrent detections ──
+async function loop() {
+  if (model && video.readyState >= 2 && video.videoWidth > 0) {
+    resizeCanvas();
+    try {
+      const preds = await model.detect(video);
+
+      // Dithered video frame as background, then boxes on top
+      applyDither();
+
+      const ch  = STORY[chapter];
+      const hit = preds.find(p => p.class === ch.target && p.score > 0.3);
+
+      // Draw ALL detections with labels
+      preds.forEach(p => drawBox(p, p.class === ch.target));
+
+      // VCR sweep overlay
+      drawVCR();
+
+      // Debug counter top-left
+      ctx.font = 'bold 12px monospace';
+      ctx.fillStyle = 'rgba(255,255,255,0.85)';
+      ctx.fillText(`${preds.length} object${preds.length !== 1 ? 's' : ''} detected`, 10, 20);
+
+      if (!isCapturing) {
+        if (hit) {
+          if (!holdStart) holdStart = performance.now();
+          const prog = Math.min((performance.now() - holdStart) / (ch.holdSec * 1000), 1);
+          holdLabel.classList.add('show');
+          drawArc(hit, prog);
+          if (prog >= 1) triggerCapture(ch);
+        } else {
+          holdStart = null;
+          holdLabel.classList.remove('show');
+        }
+      }
+    } catch(e) {
+      console.warn('Detection error:', e);
+    }
+  }
+  // Schedule NEXT frame only after this one is fully done
+  requestAnimationFrame(loop);
 }
 
-function type(text, speaker = 'KARDIA') {
+// ── CHAPTERS ──
+function loadChapter(i) {
+  chapter = i; introIdx = 0; isCapturing = false; holdStart = null;
+  holdLabel.classList.remove('show');
+  const ch = STORY[i];
+
+  // Fade out → update text → fade in
+  chapterEl.classList.add('fade');
+  setTimeout(() => {
+    chapterEl.textContent = ch.chapter;
+    chapterEl.classList.remove('fade');
+  }, 600);
+
+  questEl.textContent = '';
+  const isOnlyLine = ch.intro.length === 1;
+  type(ch.intro[0], 'KARDIA', isOnlyLine ? revealQuest : null);
+}
+
+function revealQuest() {
+  questEl.textContent = STORY[chapter].quest;
+}
+
+function type(text, speaker = 'KARDIA', onDone = null) {
   if (typeTimer) clearInterval(typeTimer);
   speakerEl.textContent = speaker;
-  diagEl.textContent    = '';
+  diagEl.textContent = '';
   let i = 0;
   typeTimer = setInterval(() => {
     diagEl.textContent += text[i++];
-    if (i >= text.length) clearInterval(typeTimer);
+    if (i >= text.length) {
+      clearInterval(typeTimer);
+      if (onDone) onDone();
+    }
   }, 38);
 }
 
-// Tap dialogue to advance intro lines
-diagBox.addEventListener('click', () => {
+document.getElementById('diagBox').addEventListener('click', () => {
   if (isCapturing) return;
   const next = Math.min(introIdx + 1, STORY[chapter].intro.length - 1);
-  if (next !== introIdx) { introIdx = next; type(STORY[chapter].intro[introIdx]); }
+  if (next !== introIdx) {
+    introIdx = next;
+    const isLast = introIdx === STORY[chapter].intro.length - 1;
+    type(STORY[chapter].intro[introIdx], 'KARDIA', isLast ? revealQuest : null);
+  }
 });
 
-// ══════════════════════════════════════════
-//  CANVAS
-// ══════════════════════════════════════════
-function resizeCanvas() {
-  canvas.width  = canvas.offsetWidth;
-  canvas.height = canvas.offsetHeight;
-}
-window.addEventListener('resize', resizeCanvas);
-
-// ══════════════════════════════════════════
-//  DETECT LOOP
-// ══════════════════════════════════════════
-async function detect() {
-  requestAnimationFrame(detect);
-  if (!model || video.readyState < 2) return;
-  resizeCanvas();
-
-  const preds = await model.detect(video);
-  ctx.clearRect(0, 0, canvas.width, canvas.height);
-
-  const ch  = STORY[chapter];
-  const hit = preds.find(p => p.class === ch.target && p.score > 0.45);
-
-  preds.forEach(p => drawBox(p, p.class === ch.target));
-
-  if (isCapturing) return;
-
-  if (hit) {
-    if (!holdStart) holdStart = performance.now();
-    const prog = Math.min((performance.now() - holdStart) / (ch.holdSec * 1000), 1);
-    holdLabel.classList.add('show');
-    drawArc(hit, prog);
-    if (prog >= 1) triggerCapture(ch);
-  } else {
-    holdStart = null;
-    holdLabel.classList.remove('show');
-  }
-}
-
-// ══════════════════════════════════════════
-//  CAPTURE SEQUENCE
-// ══════════════════════════════════════════
 function triggerCapture(ch) {
   isCapturing = true;
   holdLabel.classList.remove('show');
+  triggerVCR();
   questEl.textContent = '✦  CAPTURED';
   let i = 0;
   type(ch.capture[0]);
@@ -575,63 +723,69 @@ function triggerCapture(ch) {
   }, 2800);
 }
 
-// ══════════════════════════════════════════
-//  DRAWING
-// ══════════════════════════════════════════
+// ── CANVAS ──
+function resizeCanvas() {
+  if (canvas.offsetWidth  !== canvas.width)  canvas.width  = canvas.offsetWidth;
+  if (canvas.offsetHeight !== canvas.height) canvas.height = canvas.offsetHeight;
+}
+window.addEventListener('resize', resizeCanvas);
+
+// ── DRAWING ──
 function project(bbox) {
   const [x, y, w, h] = bbox;
-  const s    = Math.max(canvas.width / video.videoWidth, canvas.height / video.videoHeight);
-  const offX = (canvas.width  - video.videoWidth  * s) / 2;
-  const offY = (canvas.height - video.videoHeight * s) / 2;
-  return { x: x*s+offX, y: y*s+offY, w: w*s, h: h*s };
+  const s  = Math.max(canvas.width / video.videoWidth, canvas.height / video.videoHeight);
+  const ox = (canvas.width  - video.videoWidth  * s) / 2;
+  const oy = (canvas.height - video.videoHeight * s) / 2;
+  return { x: x*s+ox, y: y*s+oy, w: w*s, h: h*s };
 }
 
 function drawBox(pred, isTarget) {
   const { x, y, w, h } = project(pred.bbox);
-  const col  = isTarget ? '#6aa0c4' : 'rgba(106,160,196,0.2)';
-  const tick = isTarget ? 14 : 7;
-
+  const col  = isTarget ? '#7ab3d4' : 'rgba(255,255,255,0.7)';
+  const tick = isTarget ? 14 : 10;
   ctx.strokeStyle = col;
-  ctx.lineWidth   = isTarget ? 1.8 : 0.9;
+  ctx.lineWidth   = isTarget ? 2 : 1.5;
   ctx.shadowColor = col;
-  ctx.shadowBlur  = isTarget ? 8 : 0;
-
+  ctx.shadowBlur  = isTarget ? 10 : 0;
   [[x,y,1,1],[x+w,y,-1,1],[x,y+h,1,-1],[x+w,y+h,-1,-1]].forEach(([cx,cy,dx,dy]) => {
     ctx.beginPath();
-    ctx.moveTo(cx + dx*tick, cy);
+    ctx.moveTo(cx+dx*tick, cy);
     ctx.lineTo(cx, cy);
-    ctx.lineTo(cx, cy + dy*tick);
+    ctx.lineTo(cx, cy+dy*tick);
     ctx.stroke();
   });
-
-  if (isTarget) {
-    ctx.shadowBlur = 0;
-    ctx.font = '10px monospace';
-    ctx.fillStyle = col;
-    ctx.fillText(`${pred.class.toUpperCase()}  ${Math.round(pred.score*100)}%`, x+6, y-7);
-  }
   ctx.shadowBlur = 0;
+
+  // Label on EVERY detection
+  const label = `${pred.class}  ${Math.round(pred.score * 100)}%`;
+  ctx.font = `${isTarget ? 'bold ' : ''}12px monospace`;
+  const tw = ctx.measureText(label).width;
+  const lx = x, ly = y > 20 ? y - 6 : y + h + 16;
+
+  // Background pill for readability
+  ctx.fillStyle = isTarget ? 'rgba(122,179,212,0.85)' : 'rgba(0,0,0,0.5)';
+  ctx.fillRect(lx, ly - 13, tw + 8, 17);
+
+  ctx.fillStyle = '#ffffff';
+  ctx.fillText(label, lx + 4, ly);
 }
 
 function drawArc(pred, progress) {
   const { x, y, w, h } = project(pred.bbox);
-  const cx = x + w/2, cy = y + h/2;
-  const r  = Math.max(w, h) * 0.56;
-
+  const cx = x+w/2, cy = y+h/2, r = Math.max(w,h)*0.56;
   ctx.beginPath();
   ctx.arc(cx, cy, r, 0, Math.PI*2);
-  ctx.strokeStyle = 'rgba(106,160,196,0.18)';
-  ctx.lineWidth   = 3;
+  ctx.strokeStyle = 'rgba(122,179,212,0.2)';
+  ctx.lineWidth = 3;
   ctx.stroke();
-
   ctx.beginPath();
   ctx.arc(cx, cy, r, -Math.PI/2, -Math.PI/2 + Math.PI*2*progress);
-  ctx.strokeStyle = '#6aa0c4';
-  ctx.lineWidth   = 3;
-  ctx.shadowColor = '#6aa0c4';
-  ctx.shadowBlur  = 14;
+  ctx.strokeStyle = '#7ab3d4';
+  ctx.lineWidth = 3;
+  ctx.shadowColor = '#7ab3d4';
+  ctx.shadowBlur = 14;
   ctx.stroke();
-  ctx.shadowBlur  = 0;
+  ctx.shadowBlur = 0;
 }
 </script>
 </body>
