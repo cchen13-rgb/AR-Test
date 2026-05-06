@@ -3,10 +3,11 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-<title>CAMERA\SPOT</title>
+<title>CAMERA\SPOT — MULTI PLAYER</title>
 <link rel="stylesheet" href="https://use.typekit.net/mjw2tfe.css">
 <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-database-compat.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/delaunator@5.0.0/delaunator.min.js"></script>
 <style>
   :root {
     --lime:#C8F95A; --ink:#0A0A0A; --paper:#F5F5F0; --danger:#ff4d4d;
@@ -41,15 +42,6 @@
   .label.target.prompt .big { font-size:15px; letter-spacing:0.02em; line-height:1.35; text-transform:none; }
   .label.meta { top:26px; right:28px; writing-mode:vertical-rl; transform:rotate(180deg); padding:12px 8px; }
   .label.status { bottom:130px; left:28px; max-width:75%; }
-  .actions { position:absolute; left:28px; right:28px; bottom:28px;
-    display:flex; gap:10px; z-index:12; pointer-events:auto; }
-  .btn { flex:1; background:var(--lime); color:var(--ink); border:none; padding:16px 14px;
-    font-family:var(--mono); font-weight:800; font-size:13px; letter-spacing:0.12em;
-    text-transform:uppercase; cursor:pointer; transition:transform .08s ease; }
-  .btn:active { transform:scale(0.97); }
-  .btn.ghost { background:transparent; color:var(--lime); border:2px solid var(--lime);
-    flex:0 0 56px; padding:16px 0; font-size:18px; }
-  .btn.ink { background:var(--ink); color:var(--lime); border:2px solid var(--lime); }
   .shutter-wrap {
     position:absolute; left:28px; right:28px; bottom:28px;
     display:flex; align-items:center; justify-content:center; gap:14px;
@@ -66,10 +58,6 @@
     font-family:var(--mono); font-weight:800; font-size:18px;
     cursor:pointer; display:flex; align-items:center; justify-content:center; }
   .icon-btn:active { transform:scale(0.95); }
-  .score { position:absolute; bottom:118px; right:28px; background:var(--ink);
-    color:var(--lime); border:2px solid var(--lime); padding:10px 14px;
-    font-family:var(--mono); font-weight:800; font-size:13px; letter-spacing:0.1em;
-    z-index:11; display:none; }
   .screen {
     position:absolute; inset:0; background:var(--ink); z-index:50;
     display:none; flex-direction:column; padding:32px 28px; overflow-y:auto; }
@@ -79,19 +67,50 @@
   .screen-foot { flex:0 0 auto; display:flex; justify-content:space-between;
     font-family:var(--mono); font-size:10.5px; letter-spacing:0.12em;
     color:var(--paper); opacity:0.5; padding-top:24px; }
-  .splash h1 { font-family:var(--display); font-size:clamp(44px,11vw,96px);
+  .splash h1 { font-family:var(--display); font-size:clamp(58px,15vw,96px);
     line-height:0.92; font-weight:700; letter-spacing:-0.01em; color:var(--paper); }
-  .splash h1 .accent { background:var(--lime); color:var(--ink); padding:0 10px; display:inline-block; }
+
+  /* --- Reveal animation --- */
+  .h1-line { display:block; overflow:hidden; padding-bottom:0.08em; }
+  .h1-word { display:inline-block;
+    opacity:0; transform:translateY(110%);
+    animation:wordUp 0.62s cubic-bezier(0.22,1,0.36,1) forwards; }
+  .h1-line:nth-child(1) .h1-word { animation-delay: 0.05s; }
+  .h1-line:nth-child(2) .h1-word { animation-delay: 0.22s; }
+  .h1-line:nth-child(3) .h1-word { animation-delay: 0.39s; }
+  @keyframes wordUp {
+    to { opacity:1; transform:translateY(0); }
+  }
+
+  /* accent highlight wipe */
+  .splash h1 .accent {
+    color:var(--ink); padding:0 10px; display:inline-block;
+    position:relative; isolation:isolate; }
+  .splash h1 .accent::before {
+    content:'';
+    position:absolute; inset:0;
+    background:var(--lime);
+    transform:scaleX(0); transform-origin:left center;
+    z-index:-1;
+    animation:wipeIn 0.5s cubic-bezier(0.22,1,0.36,1) 0.72s forwards; }
+  /* text itself fades in slightly after wipe starts */
+  .splash h1 .accent .h1-word { animation-delay: 0.82s; color:var(--ink); }
+  @keyframes wipeIn {
+    to { transform:scaleX(1); }
+  }
   .splash p { font-family:var(--mono); font-size:12.5px; line-height:1.65;
     color:var(--paper); letter-spacing:0.05em; max-width:460px; }
-  .mode-grid { display:grid; gap:14px; grid-template-columns:1fr 1fr; margin-top:8px; }
-  @media (max-width:560px) { .mode-grid { grid-template-columns:1fr; } }
+  .btn { flex:1; background:var(--lime); color:var(--ink); border:none; padding:16px 14px;
+    font-family:var(--mono); font-weight:800; font-size:13px; letter-spacing:0.12em;
+    text-transform:uppercase; cursor:pointer; transition:transform .08s ease; }
+  .btn:active { transform:scale(0.97); }
+  .btn.ink { background:var(--ink); color:var(--lime); border:2px solid var(--lime); }
   .mode-card {
     background:transparent; border:2px solid var(--lime);
     padding:22px 22px 20px; color:var(--paper);
     text-align:left; cursor:pointer;
     display:flex; flex-direction:column; gap:14px;
-    min-height:180px; transition:background .15s ease; }
+    max-width:360px; transition:background .15s ease; }
   .mode-card:hover, .mode-card:focus { background:rgba(200,249,90,0.08); }
   .mode-card .mode-tag { font-family:var(--mono); font-size:10px; font-weight:700;
     letter-spacing:0.18em; color:var(--lime); }
@@ -101,7 +120,6 @@
     color:var(--paper); letter-spacing:0.04em; opacity:0.85; }
   .mode-card .mode-go { font-family:var(--mono); font-size:12px; font-weight:800;
     letter-spacing:0.14em; color:var(--lime); margin-top:auto; text-transform:uppercase; }
-
   .error-msg { background:var(--danger); color:white; padding:12px 14px;
     font-family:var(--mono); font-size:11px; letter-spacing:0.06em; line-height:1.5;
     margin-top:8px; display:none; max-width:460px; }
@@ -117,7 +135,6 @@
     flex:1; min-height:0; background:#000 center/contain no-repeat;
     border:2px solid var(--lime); margin:14px; }
   .preview-bar { padding:20px 28px 28px; display:flex; gap:10px; }
-
   .presenting-pill {
     position:fixed; top:14px; left:50%;
     transform:translateX(-50%);
@@ -131,15 +148,14 @@
     background:var(--ink); border-radius:50%; margin-right:6px;
     animation:ppulse 1.6s ease-in-out infinite; }
   @keyframes ppulse { 0%,100% { opacity:1; } 50% { opacity:0.3; } }
-
   @media (max-width:480px) {
     .brand { top:22px; left:22px; }
     .label.target { top:82px; left:22px; }
     .label.meta { top:22px; right:22px; }
     .label.status { bottom:120px; left:22px; }
-    .actions, .shutter-wrap { left:22px; right:22px; bottom:22px; }
-    .score { right:22px; bottom:110px; }
+    .shutter-wrap { left:22px; right:22px; bottom:22px; }
     .screen { padding:24px 22px; }
+    .splash h1 { font-size:clamp(64px,18vw,96px); }
   }
 </style>
 </head>
@@ -154,25 +170,21 @@
       <div class="brand-sub"><span>S</span><span class="on">P</span><span>O</span><span>T</span></div>
     </div>
     <div class="screen-mid">
-      <h1>FIND IT,<br>SHOW IT,<br><span class="accent">SCORE.</span></h1>
-      <p>TWO WAYS TO PLAY. RACE A TIMER OR ANSWER A PROMPT — YOUR CAMERA NEVER LEAVES THIS DEVICE.</p>
-      <div class="mode-grid">
-        <button class="mode-card" id="modeSpot">
-          <div class="mode-tag">MODE 01</div>
-          <div class="mode-name">QUICK<br>SPOT</div>
-          <div class="mode-desc">Random object. 30-second timer. Camera detects when you find it.</div>
-          <div class="mode-go">START →</div>
-        </button>
-        <button class="mode-card" id="modeShow">
-          <div class="mode-tag">MODE 02</div>
-          <div class="mode-name">SHOW<br>ME</div>
-          <div class="mode-desc">A photo prompt. You compose, you capture, it goes elsewhere.</div>
-          <div class="mode-go">START →</div>
-        </button>
-      </div>
+      <h1>
+        <span class="h1-line"><span class="h1-word">FIND IT,</span></span>
+        <span class="h1-line"><span class="h1-word">KEEP IT,</span></span>
+        <span class="h1-line"><span class="accent"><span class="h1-word">SCORE.</span></span></span>
+      </h1>
+      <p></p>
+      <button class="mode-card" id="modeShow">
+        <div class="mode-tag">MODE 01</div>
+        <div class="mode-name">MULTI<br>PLAYER</div>
+        <div class="mode-desc">A photo prompt. You choose what to capture.</div>
+     
+      </button>
       <div class="error-msg" id="errorMsg"></div>
     </div>
-    <div class="screen-foot"><span>MODEL/COCO-SSD</span><span>V0.6</span></div>
+    <div class="screen-foot"><span>MODEL/COCO-SSD</span><span>V0.7</span></div>
   </div>
 
   <div class="cam-wrap">
@@ -189,18 +201,12 @@
       <div class="brand-name">CAMERA\</div>
       <div class="brand-sub"><span>S</span><span class="on">P</span><span>O</span><span>T</span></div>
     </div>
-    <div class="label target" id="targetCard">
-      <span class="small" id="targetSmall">FIND/</span>
+    <div class="label target prompt" id="targetCard">
+      <span class="small" id="targetSmall">PROMPT/</span>
       <span class="big" id="targetLabel">LOADING...</span>
     </div>
-    <div class="label meta" id="metaLabel">ROUND 01 / 00:30</div>
-    <div class="label status" id="statusLabel">POINT CAMERA AT THE OBJECT</div>
-    <div class="score" id="scoreChip">SCORE 0</div>
-
-    <div class="actions" id="actionsSpot" style="display:none;">
-      <button class="btn" id="skipBtn">SKIP TARGET →</button>
-      <button class="btn ghost" id="quitBtn">×</button>
-    </div>
+    <div class="label meta" id="metaLabel">SHOW ME / 00 CAPTURED</div>
+    <div class="label status" id="statusLabel">LOADING DETECTION...</div>
 
     <div class="shutter-wrap" id="actionsShow" style="display:none;">
       <button class="icon-btn" id="newPromptBtn" title="New prompt">↻</button>
@@ -238,7 +244,6 @@ const _firebaseConfig = {
 };
 firebase.initializeApp(_firebaseConfig);
 
-// Presenter pairing: if URL has ?session=XXXX, set up the database reference
 const _sessionCode = new URLSearchParams(window.location.search).get('session');
 let _photosRef = null;
 
@@ -248,66 +253,61 @@ if (_sessionCode) {
   console.log('[phone] connected to session', _sessionCode.toUpperCase());
 }
 
-const FINDABLE = ['bottle','cup','book','cell phone','laptop','keyboard','mouse',
-  'chair','couch','bed','dining table','tv','remote','clock','backpack','handbag','tie',
-  'banana','apple','orange','sandwich','pizza','donut','cake','fork','knife','spoon','bowl',
-  'wine glass','potted plant','vase','scissors','teddy bear','toothbrush','person'];
-
 const PROMPTS = [
-  'The oldest thing in your fridge',
-  "A book you swore you'd finish",
-  'Your most-used mug',
-  "Something on your desk that doesn't belong there",
-  'The weirdest thing in your junk drawer',
-  "A gift you'd never have bought yourself",
-  'The most expensive thing you never use',
-  "The plant you're slowly killing",
-  'Exercise equipment used as furniture',
-  'Something you bought because of an ad',
-  'A "someday" project, still waiting',
-  'The thing you keep meaning to throw out',
-  'Your most recent impulse buy',
-  'Your view, no editing',
-  "What's in your dominant hand",
-  "The shoes you're wearing today",
-  "The first thing you'll touch when you stand up",
-  "Three things within arm's reach",
-  "What's playing right now",
-  "Something with handwriting that isn't yours",
+  'Find something red',
+  "Find a imperfect circle",
+  'Take a picture from a very low angle',
+  "Find something that can move",
+  'Take a photo of something slightly broken',
+  "Get two humans to interact",
+  'You must include a person’s hand in the frame',
+  "Get someone to pose for your photo",
+  'Find someone wearing blue',
+  'Find someone feeling tired',
+  'Find something transparent',
+  'Find something with a pattern',
+  'Find something shiny',
+  'Take a close up of a eye',
+  "Take a picture of nothing",
+  "Find someone who is confused",
+  "Find something old",
+  "Find someone with short hair",
+  "Find someone with long hair",
+  "Close your eyes, spin, open, and shoot",
   'A photo of a photo',
-  'A souvenir you actually look at',
-  'Something packed for a trip, never unpacked',
-  'The most-touched object in your home',
-  "Something that's been with you in 3 places",
-  'A handed-down object',
-  'Your morning routine, one frame',
-  'Your messiest drawer',
-  "Something blue (let's see if we agree)",
-  'Your comfort food, plated honestly',
-  "What you'd cook for them tonight",
-  'Your phone lock screen',
-  'A texture you love',
-  'A really good dog you saw today',
-  'The best window within a block',
-  'Something that made you stop walking',
-  'Sky check, right now',
-  'The most interesting trash',
-  "A sign that's wrong in a funny way"
+  'A picture of a bottle',
+  'A picture of a book',
+  'Find something cute',
+  "Find something weird",
+  'Find a handmade object',
+  'Find someone wearing a t-shirt',
+  'Find something yellow',
+  "Find something edible",
+  'Take a picture of something awkward',
+  "Find something tiny",
+  'Take a blurry photo',
+  'Find something tiny',
+  'Find something filthy',
+  'Find something heavy',
+  'Find something cheap',
+  'Find something nostalgic',
+  'Take a picture for no reason',
+  "Take a picture of someone with bad posture"
 ];
 
-let mode=null, model=null, stream=null, video, overlay, ctx, capCanvas, capCtx;
+let model=null, stream=null, video, overlay, ctx, capCanvas, capCtx;
 let currentTarget=null;
-let score=0, round=0, timer=30, captures=0;
-let timerInterval=null, rafId=null;
-let gameRunning=false, foundLock=false;
+let captures=0;
+let rafId=null;
+let gameRunning=false;
 let lastBlob=null, lastDataUrl=null, lastPrompt=null;
+let latestPreds = [];
 
 const $ = id => document.getElementById(id);
 const elError=$('errorMsg'), elFlash=$('flash');
 const elHud=$('hud'), elTarget=$('targetLabel'), elTargetSmall=$('targetSmall'),
-      elTargetCard=$('targetCard'), elMeta=$('metaLabel'),
-      elStatus=$('statusLabel'), elScore=$('scoreChip');
-const elActionsSpot=$('actionsSpot'), elActionsShow=$('actionsShow');
+      elMeta=$('metaLabel'), elStatus=$('statusLabel');
+const elActionsShow=$('actionsShow');
 const elPreview=$('previewWrap'), elPreviewImg=$('previewImg');
 
 function showScreen(id) {
@@ -316,7 +316,6 @@ function showScreen(id) {
   if (target) target.classList.add('active');
 }
 
-$('modeSpot').addEventListener('click', startSpotMode);
 $('modeShow').addEventListener('click', startShowMode);
 
 async function ensureCamera() {
@@ -345,118 +344,123 @@ function showError(err) {
   else elError.textContent='ERROR: '+(err.message||err.name||'UNKNOWN');
 }
 
-async function startSpotMode() {
-  elError.style.display='none';
-  $('modeSpot').disabled=true;
-  try {
-    await ensureCamera();
-    await ensureModel();
-    mode='spot';
-    showScreen('none');
-    elHud.style.display='block';
-    elActionsSpot.style.display='flex';
-    elActionsShow.style.display='none';
-    elScore.style.display='block';
-    elTargetSmall.textContent='FIND/';
-    elTargetCard.classList.remove('prompt');
-    score=0; round=0;
-    gameRunning=true;
-    nextSpotRound(false);
-    detect();
-  } catch (err) { console.error(err); showError(err); $('modeSpot').disabled=false; }
-}
-
-function nextSpotRound(success) {
-  round++; if (success) score++;
-  let next; do { next = FINDABLE[Math.floor(Math.random()*FINDABLE.length)]; }
-  while (next===currentTarget);
-  currentTarget=next;
-  elTarget.textContent=currentTarget.toUpperCase();
-  elScore.textContent='SCORE '+score;
-  elStatus.textContent='POINT CAMERA AT THE OBJECT';
-  timer=30;
-  if (timerInterval) clearInterval(timerInterval);
-  updateMeta();
-  timerInterval=setInterval(() => {
-    timer--; updateMeta();
-    if (timer<=0) {
-      clearInterval(timerInterval);
-      elStatus.textContent='TIME UP — NEW TARGET';
-      setTimeout(() => nextSpotRound(false), 700);
-    }
-  }, 1000);
-}
-function updateMeta() {
-  if (mode==='spot') {
-    const r=String(round).padStart(2,'0'), t=String(Math.max(0,timer)).padStart(2,'0');
-    elMeta.textContent=`ROUND ${r} / 00:${t}`;
-  } else if (mode==='show') {
-    elMeta.textContent=`SHOW ME / ${String(captures).padStart(2,'0')} CAPTURED`;
+// =============================================================
+// MESH OVERLAY
+// =============================================================
+function hashCode(str) {
+  let hash = 0;
+  for (let i = 0; i < str.length; i++) {
+    hash = ((hash << 5) - hash + str.charCodeAt(i)) | 0;
   }
+  return Math.abs(hash) || 1;
 }
-async function detect() {
-  if (!gameRunning || mode!=='spot') return;
-  try {
-    const preds = await model.detect(video);
-    drawDetections(preds);
-    const found = preds.find(p => p.class===currentTarget && p.score>=0.55);
-    if (found && !foundLock) onFound();
-  } catch (e) { console.error('detect error', e); }
-  rafId=requestAnimationFrame(detect);
+function mulberry32(seed) {
+  return function() {
+    let t = seed += 0x6D2B79F5;
+    t = Math.imul(t ^ t >>> 15, t | 1);
+    t ^= t + Math.imul(t ^ t >>> 7, t | 61);
+    return ((t ^ t >>> 14) >>> 0) / 4294967296;
+  };
 }
-function drawDetections(preds) {
-  ctx.clearRect(0,0,overlay.width,overlay.height);
-  preds.forEach(p => {
-    const [x,y,w,h]=p.bbox;
-    const isTarget=p.class===currentTarget;
-    ctx.lineWidth=3;
-    ctx.strokeStyle=isTarget?'#C8F95A':'rgba(255,255,255,0.55)';
-    ctx.strokeRect(x,y,w,h);
-    const label=`${p.class.toUpperCase()} ${(p.score*100).toFixed(0)}%`;
-    ctx.font='600 14px monospace';
-    const tw=ctx.measureText(label).width;
-    ctx.fillStyle=isTarget?'#C8F95A':'rgba(0,0,0,0.7)';
-    ctx.fillRect(x,y-22,tw+12,22);
-    ctx.fillStyle=isTarget?'#0A0A0A':'#ffffff';
-    ctx.fillText(label,x+6,y-6);
+function generateMeshPoints(x, y, w, h, seedKey) {
+  const rng = mulberry32(hashCode(String(seedKey) + Math.floor(x/20) + Math.floor(y/20) + Math.floor(w/20) + Math.floor(h/20)));
+  const pts = [
+    [x, y], [x+w, y], [x, y+h], [x+w, y+h],
+    [x+w*0.5, y], [x+w*0.5, y+h],
+    [x, y+h*0.5], [x+w, y+h*0.5],
+  ];
+  const numInternal = 16;
+  for (let i = 0; i < numInternal; i++) {
+    pts.push([
+      x + 0.08*w + rng() * 0.84 * w,
+      y + 0.08*h + rng() * 0.84 * h
+    ]);
+  }
+  return pts;
+}
+function drawObjectMesh(targetCtx, x, y, w, h, seedKey) {
+  if (typeof Delaunator === 'undefined') return;
+  const points = generateMeshPoints(x, y, w, h, seedKey);
+  const flat = [];
+  points.forEach(p => { flat.push(p[0], p[1]); });
+  let tri;
+  try { tri = new Delaunator(flat); } catch(e) { return; }
+  targetCtx.strokeStyle = 'rgba(200, 249, 90, 0.72)';
+  targetCtx.lineWidth = Math.max(1.2, w * 0.0015);
+  targetCtx.lineCap = 'round';
+  targetCtx.lineJoin = 'round';
+  for (let i = 0; i < tri.triangles.length; i += 3) {
+    const a = points[tri.triangles[i]];
+    const b = points[tri.triangles[i+1]];
+    const c = points[tri.triangles[i+2]];
+    targetCtx.beginPath();
+    targetCtx.moveTo(a[0], a[1]);
+    targetCtx.lineTo(b[0], b[1]);
+    targetCtx.lineTo(c[0], c[1]);
+    targetCtx.closePath();
+    targetCtx.stroke();
+  }
+  targetCtx.fillStyle = 'rgba(200, 249, 90, 0.95)';
+  const r = Math.max(2.5, w * 0.0035);
+  points.forEach(([px, py]) => {
+    targetCtx.beginPath();
+    targetCtx.arc(px, py, r, 0, Math.PI * 2);
+    targetCtx.fill();
   });
 }
-function onFound() {
-  foundLock=true;
-  elFlash.classList.add('on');
-  elStatus.textContent='FOUND ✓ +1 POINT';
-  setTimeout(() => elFlash.classList.remove('on'), 200);
-  setTimeout(() => { foundLock=false; nextSpotRound(true); }, 1100);
+function drawMeshOverlay(preds) {
+  if (!ctx) return;
+  ctx.clearRect(0, 0, overlay.width, overlay.height);
+  preds.forEach(p => {
+    const [x, y, w, h] = p.bbox;
+    drawObjectMesh(ctx, x, y, w, h, p.class);
+  });
 }
-$('skipBtn').addEventListener('click', () => nextSpotRound(false));
-$('quitBtn').addEventListener('click', quitGame);
+// =============================================================
 
 async function startShowMode() {
   elError.style.display='none';
   try {
     await ensureCamera();
-    mode='show';
-    captures=0;
     showScreen('none');
     elHud.style.display='block';
-    elActionsSpot.style.display='none';
     elActionsShow.style.display='flex';
-    elScore.style.display='none';
+    captures=0;
+    latestPreds=[];
     if (rafId) cancelAnimationFrame(rafId);
-    if (timerInterval) clearInterval(timerInterval);
     if (ctx) ctx.clearRect(0,0,overlay.width,overlay.height);
     elTargetSmall.textContent='PROMPT/';
-    elTargetCard.classList.add('prompt');
-    elStatus.textContent='COMPOSE — TAP THE GREEN BUTTON';
+    elStatus.textContent='LOADING DETECTION...';
+    gameRunning=true;
     nextPrompt();
+    ensureModel().then(() => {
+      if (gameRunning) {
+        elStatus.textContent='COMPOSE — TAP THE GREEN BUTTON';
+        showMeDetect();
+      }
+    }).catch(e => {
+      console.warn('model load failed', e);
+      elStatus.textContent='COMPOSE — TAP THE GREEN BUTTON';
+    });
   } catch (err) { console.error(err); showError(err); showScreen('splash'); }
 }
+
+async function showMeDetect() {
+  if (!gameRunning || !model) return;
+  try {
+    const preds = await model.detect(video);
+    latestPreds = preds.filter(p => p.score >= 0.45);
+    drawMeshOverlay(latestPreds);
+  } catch (e) { console.error('mesh detect error', e); }
+  rafId = requestAnimationFrame(showMeDetect);
+}
+
 function nextPrompt() {
   let p; do { p = PROMPTS[Math.floor(Math.random()*PROMPTS.length)]; }
   while (p===currentTarget && PROMPTS.length>1);
   currentTarget=p;
   elTarget.textContent=p;
-  updateMeta();
+  elMeta.textContent=`SHOW ME / ${String(captures).padStart(2,'0')} CAPTURED`;
 }
 $('newPromptBtn').addEventListener('click', nextPrompt);
 $('quitBtn2').addEventListener('click', quitGame);
@@ -469,6 +473,13 @@ function capture() {
   setTimeout(() => elFlash.classList.remove('white'), 400);
 
   capCtx.drawImage(video, 0, 0, capCanvas.width, capCanvas.height);
+
+  if (latestPreds && latestPreds.length > 0) {
+    latestPreds.forEach(p => {
+      const [x, y, w, h] = p.bbox;
+      drawObjectMesh(capCtx, x, y, w, h, p.class);
+    });
+  }
 
   const W=capCanvas.width, H=capCanvas.height;
   const pad=Math.round(W*0.025);
@@ -525,7 +536,6 @@ $('retakeBtn').addEventListener('click', () => {
 
 $('keepBtn').addEventListener('click', () => {
   if (!lastDataUrl) return;
-  // Push to Firebase (only if session code in URL)
   if (_photosRef) {
     _photosRef.push({
       dataUrl: lastDataUrl,
@@ -535,7 +545,7 @@ $('keepBtn').addEventListener('click', () => {
       .catch(e => console.error('[phone] push failed', e));
   }
   captures++;
-  updateMeta();
+  elMeta.textContent=`SHOW ME / ${String(captures).padStart(2,'0')} CAPTURED`;
   elPreview.classList.remove('active');
   lastBlob = null; lastDataUrl = null; lastPrompt = null;
   nextPrompt();
@@ -543,17 +553,14 @@ $('keepBtn').addEventListener('click', () => {
 
 function quitGame() {
   gameRunning=false;
-  if (timerInterval) clearInterval(timerInterval);
   if (rafId) cancelAnimationFrame(rafId);
   if (ctx) ctx.clearRect(0,0,overlay.width,overlay.height);
   if (stream) { stream.getTracks().forEach(t => t.stop()); stream=null; }
   elHud.style.display='none';
-  elActionsSpot.style.display='none';
   elActionsShow.style.display='none';
-  elScore.style.display='none';
   elPreview.classList.remove('active');
-  $('modeSpot').disabled=false;
   showScreen('splash');
+  latestPreds = [];
 }
 
 window.addEventListener('resize', () => {
