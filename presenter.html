@@ -1,0 +1,422 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>HASKELL\ARCHIVE — PRESENTER</title>
+<link rel="stylesheet" href="https://use.typekit.net/mjw2tfe.css">
+<link href="https://fonts.googleapis.com/css2?family=Caveat:wght@400;600;700&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --paper: #F0EDE3;
+    --ink: #1A1715;
+    --lime: #C8F95A;
+    --display: "patriot", 'Helvetica Neue', sans-serif;
+    --mono: 'JetBrains Mono', 'SF Mono', monospace;
+    --hand: 'Caveat', 'Bradley Hand', cursive;
+  }
+  * { box-sizing:border-box; margin:0; padding:0; }
+  html, body {
+    min-height:100vh; background:var(--paper); color:var(--ink);
+    font-family:var(--display); overflow-x:hidden;
+    background-image:
+      radial-gradient(circle at 18% 27%, rgba(0,0,0,0.025) 1px, transparent 1px),
+      radial-gradient(circle at 73% 81%, rgba(0,0,0,0.02) 1px, transparent 1px),
+      radial-gradient(circle at 41% 64%, rgba(0,0,0,0.018) 1px, transparent 1px);
+    background-size: 38px 38px, 51px 51px, 29px 29px;
+  }
+
+  .header { position:fixed; top:32px; left:40px; z-index:200; }
+  .header-name { font-family:var(--display); font-size:24px; font-weight:700; letter-spacing:0.01em; }
+  .header-sub {
+    display:flex; gap:4px; margin-top:6px;
+    font-family:var(--mono); font-size:11px; font-weight:700; letter-spacing:0.22em;
+  }
+  .header-sub span { padding:2px 6px; }
+  .header-sub span.on { background:var(--lime); }
+
+  .session-info {
+    position:fixed; top:32px; right:40px; z-index:200;
+    font-family:var(--mono); font-size:10px; letter-spacing:0.22em; text-align:right;
+  }
+  .session-info .label { opacity:0.5; }
+  .session-code {
+    background:var(--ink); color:var(--paper);
+    padding:5px 9px; margin-top:6px; display:inline-block;
+    font-weight:800; font-size:13px;
+  }
+  .conn-status { margin-top:8px; opacity:0.55; font-size:10px; }
+  .conn-status.live { opacity:1; color:#2e7d32; }
+  .conn-status.live::before {
+    content:''; display:inline-block; width:6px; height:6px;
+    background:#2e7d32; border-radius:50%; margin-right:6px;
+    animation:pulse 1.6s ease-in-out infinite;
+  }
+  @keyframes pulse { 0%,100% { opacity:1; } 50% { opacity:0.3; } }
+
+  .watermark {
+    position:fixed; bottom:-48px; left:50%; transform:translateX(-50%);
+    font-family:var(--display); font-size:clamp(180px,22vw,320px);
+    font-weight:900; color:rgba(26,23,21,0.045);
+    letter-spacing:-0.04em; pointer-events:none; z-index:0; line-height:1;
+  }
+
+  .scattered {
+    position:fixed; pointer-events:none; z-index:1;
+    font-family:var(--mono); font-size:11px; letter-spacing:0.22em;
+    color:rgba(26,23,21,0.28); text-transform:uppercase;
+  }
+
+  .stage { position:relative; min-height:100vh; padding:140px 40px 200px; z-index:5; }
+
+  .pairing {
+    position:absolute; left:50%; top:50%;
+    transform:translate(-50%,-50%);
+    background:white; padding:24px;
+    border:2px solid var(--ink);
+    box-shadow: 4px 4px 0 var(--ink), 0 18px 36px rgba(0,0,0,0.12);
+    display:flex; flex-direction:column; align-items:center;
+    gap:14px; z-index:10;
+  }
+  .pairing.gone { display:none; }
+  .pairing .qr-img {
+    display:block; width:200px; height:200px;
+    background:#f0f0f0;
+  }
+  .pairing-text {
+    font-family:var(--mono); font-size:11px; font-weight:800;
+    letter-spacing:0.18em; text-align:center; line-height:1.6;
+  }
+  .pairing-or {
+    font-family:var(--mono); font-size:9px; opacity:0.5;
+    letter-spacing:0.2em; padding:4px 0;
+  }
+  .pairing-code {
+    font-family:var(--mono); font-size:14px; font-weight:800;
+    letter-spacing:0.16em; background:var(--lime); padding:6px 12px;
+  }
+  .pairing-url {
+    font-family:var(--mono); font-size:9px;
+    color:#888; max-width:200px; text-align:center;
+    word-break:break-all; margin-top:4px;
+  }
+
+  .empty-title {
+    position:absolute; left:50%; top:18%;
+    transform:translateX(-50%);
+    font-family:var(--hand); font-size:clamp(64px,9vw,112px);
+    font-weight:600; color:var(--ink); white-space:nowrap;
+    z-index:5;
+  }
+  .empty-sub {
+    position:absolute; left:50%; top:84%;
+    transform:translateX(-50%);
+    font-family:var(--mono); font-size:11px; letter-spacing:0.22em;
+    text-align:center; opacity:0.55; max-width:480px;
+    line-height:1.7;
+  }
+
+  .polaroid {
+    position:absolute;
+    background:white; padding:14px 14px 56px;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.06), 0 14px 30px rgba(0,0,0,0.18);
+    transform-origin:center;
+    transition: opacity 0.5s ease, transform 0.5s cubic-bezier(.34,1.56,.64,1);
+    will-change: transform, opacity;
+  }
+  .polaroid.entering { opacity:0; transform:scale(0.6) rotate(0deg) !important; }
+  .polaroid img {
+    display:block; width:320px; aspect-ratio:16/9;
+    object-fit:cover; background:#000;
+  }
+  .polaroid .caption {
+    font-family:var(--hand); font-size:24px; font-weight:600;
+    color:#2a2520; margin-top:12px; line-height:1.05; max-width:320px;
+    word-wrap:break-word;
+  }
+  .polaroid .timestamp {
+    font-family:var(--mono); font-size:9px; letter-spacing:0.18em;
+    color:#999; margin-top:4px;
+  }
+  .polaroid .tape {
+    position:absolute; top:-10px; left:50%;
+    transform:translateX(-50%) rotate(-3deg);
+    width:80px; height:22px;
+    background:rgba(200,249,90,0.55);
+    border:1px solid rgba(0,0,0,0.05);
+  }
+
+  .footer-title {
+    position:fixed; bottom:60px; left:50%;
+    transform:translateX(-50%);
+    font-family:var(--hand); font-size:clamp(56px,8vw,96px);
+    font-weight:700; color:var(--ink); white-space:nowrap;
+    z-index:6; letter-spacing:-0.01em;
+  }
+  .footer-rule {
+    position:fixed; bottom:50px; left:50%;
+    transform:translateX(-50%);
+    width:clamp(180px,18vw,260px); height:2px;
+    background:var(--ink); z-index:6;
+  }
+  .footer-meta {
+    position:fixed; bottom:24px; left:50%;
+    transform:translateX(-50%);
+    font-family:var(--mono); font-size:10px; letter-spacing:0.22em;
+    opacity:0.5; z-index:6;
+  }
+
+  .controls {
+    position:fixed; bottom:24px; right:24px; z-index:200;
+    display:flex; gap:8px;
+  }
+  .ctrl-btn {
+    background:transparent; border:1.5px solid var(--ink);
+    padding:8px 12px; font-family:var(--mono); font-size:10px;
+    font-weight:800; letter-spacing:0.16em; text-transform:uppercase;
+    cursor:pointer; color:var(--ink);
+    transition:background 0.15s ease;
+  }
+  .ctrl-btn:hover { background:var(--ink); color:var(--paper); }
+
+  .drop-overlay {
+    position:fixed; inset:0; z-index:300;
+    background:rgba(200,249,90,0.85);
+    border:8px dashed var(--ink);
+    display:none; align-items:center; justify-content:center;
+    font-family:var(--display); font-size:clamp(40px,8vw,84px);
+    font-weight:700; pointer-events:none;
+  }
+  .drop-overlay.active { display:flex; }
+</style>
+</head>
+<body>
+
+  <div class="watermark">ARCHIVE</div>
+
+  <div class="scattered" style="top:24%; left:5%; transform:rotate(-8deg);">a private collage</div>
+  <div class="scattered" style="top:62%; right:6%; transform:rotate(6deg);">who were you today?</div>
+  <div class="scattered" style="bottom:22%; left:8%; transform:rotate(3deg);">— answers, not posts</div>
+  <div class="scattered" style="top:42%; right:14%; transform:rotate(-4deg);">prompt by prompt</div>
+
+  <div class="header">
+    <div class="header-name">HASKELL\</div>
+    <div class="header-sub">
+      <span>S</span><span>P</span><span>O</span><span>T</span>
+      <span style="opacity:0.4;">/</span>
+      <span class="on">PRESENTER</span>
+    </div>
+  </div>
+
+  <div class="session-info">
+    <div class="label">SESSION</div>
+    <div class="session-code" id="sessionCode">— — — —</div>
+    <div class="conn-status" id="connStatus">WAITING</div>
+  </div>
+
+  <div class="stage" id="stage">
+    <div class="empty-title" id="emptyTitle">scan to begin</div>
+    <div class="pairing" id="pairing">
+      <img id="qrimg" class="qr-img" alt="QR code">
+      <div class="pairing-text">SCAN WITH YOUR PHONE</div>
+      <div class="pairing-or">— OR ENTER CODE —</div>
+      <div class="pairing-code" id="pairingCode">LOADING</div>
+      <div class="pairing-url" id="pairingUrl"></div>
+    </div>
+    <div class="empty-sub" id="emptySub">
+      OPEN HASKELL\SPOT ON YOUR PHONE.<br>
+      EVERY PHOTO YOU KEEP WILL APPEAR HERE.
+    </div>
+  </div>
+
+  <div class="footer-title">the archive</div>
+  <div class="footer-rule"></div>
+  <div class="footer-meta" id="footerMeta">PRIVATE / PRESENTER VIEW</div>
+
+  <div class="controls">
+    <button class="ctrl-btn" id="demoBtn">+ DEMO PHOTO</button>
+    <button class="ctrl-btn" id="clearBtn">CLEAR</button>
+  </div>
+
+  <div class="drop-overlay" id="dropOverlay">DROP TO ADD</div>
+
+<script src="https://unpkg.com/peerjs@1.5.4/dist/peerjs.min.js"></script>
+<script>
+const $ = id => document.getElementById(id);
+
+// --- 1. Generate session code IMMEDIATELY (no waiting on anything) ---
+const sessionCode = Math.random().toString(36).substring(2, 6).toUpperCase();
+const peerId = 'haskell-spot-' + sessionCode.toLowerCase();
+
+$('sessionCode').textContent = sessionCode;
+$('pairingCode').textContent = sessionCode;
+
+// --- 2. Build phone URL and show QR code IMMEDIATELY ---
+const baseUrl = window.location.href.replace(/presenter\.html.*$/, 'index.html').split('?')[0];
+const phoneUrl = `${baseUrl}?session=${sessionCode}`;
+$('pairingUrl').textContent = phoneUrl;
+
+// URL-based QR generator — no library needed
+const qrSrc = `https://api.qrserver.com/v1/create-qr-code/?size=240x240&margin=2&color=1A1715&bgcolor=FFFFFF&data=${encodeURIComponent(phoneUrl)}`;
+$('qrimg').src = qrSrc;
+
+console.log('[presenter] session code:', sessionCode);
+console.log('[presenter] phone URL:', phoneUrl);
+
+// --- 3. Layout slots for the collage ---
+const SLOTS = [
+  { x: 0.20, y: 0.32, rot: -7 },
+  { x: 0.50, y: 0.26, rot: 4 },
+  { x: 0.78, y: 0.34, rot: -3 },
+  { x: 0.28, y: 0.62, rot: 6 },
+  { x: 0.58, y: 0.66, rot: -5 },
+  { x: 0.82, y: 0.60, rot: 8 },
+  { x: 0.14, y: 0.46, rot: 3 },
+  { x: 0.65, y: 0.46, rot: -8 },
+  { x: 0.40, y: 0.46, rot: 2 },
+];
+
+let photoCount = 0;
+const stage = $('stage');
+
+function placePhoto({ dataUrl, prompt, timestamp }) {
+  if (photoCount === 0) {
+    $('pairing').classList.add('gone');
+    $('emptyTitle').style.display = 'none';
+    $('emptySub').style.display = 'none';
+  }
+  const slot = SLOTS[photoCount % SLOTS.length];
+  const overflow = Math.floor(photoCount / SLOTS.length);
+  const jx = (Math.sin(photoCount * 7.3) * 24) + (overflow * 18);
+  const jy = (Math.cos(photoCount * 11.1) * 18) + (overflow * 14);
+
+  const polaroid = document.createElement('div');
+  polaroid.className = 'polaroid entering';
+  polaroid.style.left = `calc(${slot.x * 100}% + ${jx}px)`;
+  polaroid.style.top = `calc(${slot.y * 100}% + ${jy}px)`;
+  polaroid.style.transform = `translate(-50%,-50%) rotate(${slot.rot}deg)`;
+  polaroid.style.zIndex = 20 + photoCount;
+
+  const tape = photoCount % 3 === 1 ? '<div class="tape"></div>' : '';
+  const t = new Date(timestamp || Date.now());
+  const timeStr = t.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+
+  polaroid.innerHTML = `
+    ${tape}
+    <img src="${dataUrl}" alt="">
+    <div class="caption">${escapeHtml(prompt || '')}</div>
+    <div class="timestamp">${String(photoCount + 1).padStart(2,'0')} · ${timeStr}</div>
+  `;
+  stage.appendChild(polaroid);
+  requestAnimationFrame(() => {
+    requestAnimationFrame(() => polaroid.classList.remove('entering'));
+  });
+  photoCount++;
+}
+
+function escapeHtml(s) {
+  return String(s).replace(/[&<>"']/g, c => ({
+    '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'
+  }[c]));
+}
+
+// --- 4. Now start PeerJS to listen for incoming photos ---
+try {
+  const peer = new Peer(peerId, { debug: 1 });
+
+  peer.on('open', (id) => {
+    console.log('[presenter] peer open, ready to receive at id:', id);
+    $('connStatus').textContent = 'READY';
+  });
+
+  peer.on('connection', (conn) => {
+    console.log('[presenter] phone connected');
+    $('connStatus').textContent = 'CONNECTED';
+    $('connStatus').classList.add('live');
+    conn.on('data', (data) => {
+      console.log('[presenter] received', data && data.type);
+      if (data && data.type === 'photo' && data.dataUrl) {
+        placePhoto(data);
+      }
+    });
+    conn.on('close', () => {
+      $('connStatus').textContent = 'DISCONNECTED';
+      $('connStatus').classList.remove('live');
+    });
+  });
+
+  peer.on('error', (e) => {
+    console.warn('[presenter] peer error', e);
+    $('connStatus').textContent = 'OFFLINE — DRAG-DROP OK';
+  });
+} catch (e) {
+  console.error('[presenter] peer setup failed', e);
+  $('connStatus').textContent = 'OFFLINE — DRAG-DROP OK';
+}
+
+// --- 5. Demo + clear buttons + drag-drop ---
+$('demoBtn').addEventListener('click', () => {
+  const samplePrompts = [
+    'The oldest thing in your fridge',
+    'Your most-used mug',
+    "The plant you're slowly killing",
+    "What's in your dominant hand",
+    "Three things within arm's reach",
+    'A really good dog you saw today'
+  ];
+  const c = document.createElement('canvas');
+  c.width = 1280; c.height = 720;
+  const cx = c.getContext('2d');
+  const palette = ['#3a4a5c','#6a4a3c','#5c4a6a','#4a6a5c'];
+  const grad = cx.createLinearGradient(0, 0, 1280, 720);
+  grad.addColorStop(0, palette[photoCount % palette.length]);
+  grad.addColorStop(1, '#1A1715');
+  cx.fillStyle = grad; cx.fillRect(0, 0, 1280, 720);
+  cx.fillStyle = 'rgba(255,255,255,0.1)';
+  cx.font = 'bold 200px sans-serif';
+  cx.fillText(String(photoCount + 1).padStart(2,'0'), 540, 420);
+  const p = samplePrompts[photoCount % samplePrompts.length];
+  cx.fillStyle = '#C8F95A';
+  cx.fillRect(32, 590, 500, 100);
+  cx.fillStyle = '#1A1715';
+  cx.font = 'bold 14px monospace';
+  cx.fillText('PROMPT/', 50, 620);
+  cx.font = 'bold 22px monospace';
+  cx.fillText(p, 50, 660);
+  placePhoto({
+    dataUrl: c.toDataURL('image/jpeg', 0.85),
+    prompt: p,
+    timestamp: Date.now()
+  });
+});
+
+$('clearBtn').addEventListener('click', () => {
+  document.querySelectorAll('.polaroid').forEach(p => p.remove());
+  photoCount = 0;
+  $('pairing').classList.remove('gone');
+  $('emptyTitle').style.display = '';
+  $('emptySub').style.display = '';
+});
+
+const dropOverlay = $('dropOverlay');
+window.addEventListener('dragenter', (e) => { e.preventDefault(); dropOverlay.classList.add('active'); });
+window.addEventListener('dragover', (e) => { e.preventDefault(); });
+window.addEventListener('dragleave', (e) => {
+  if (e.relatedTarget === null) dropOverlay.classList.remove('active');
+});
+window.addEventListener('drop', (e) => {
+  e.preventDefault();
+  dropOverlay.classList.remove('active');
+  [...e.dataTransfer.files].forEach(file => {
+    if (!file.type.startsWith('image/')) return;
+    const reader = new FileReader();
+    reader.onload = () => placePhoto({
+      dataUrl: reader.result,
+      prompt: file.name.replace(/\.[^.]+$/, '').replace(/[-_]/g,' '),
+      timestamp: file.lastModified
+    });
+    reader.readAsDataURL(file);
+  });
+});
+</script>
+</body>
+</html>
