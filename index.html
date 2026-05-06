@@ -5,7 +5,8 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
 <title>HASKELL\SPOT</title>
 <link rel="stylesheet" href="https://use.typekit.net/mjw2tfe.css">
-<script src="https://unpkg.com/peerjs@1.5.4/dist/peerjs.min.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-database-compat.js"></script>
 <style>
   :root {
     --lime:#C8F95A; --ink:#0A0A0A; --paper:#F5F5F0; --danger:#ff4d4d;
@@ -171,7 +172,7 @@
       </div>
       <div class="error-msg" id="errorMsg"></div>
     </div>
-    <div class="screen-foot"><span>MODEL/COCO-SSD</span><span>V0.5</span></div>
+    <div class="screen-foot"><span>MODEL/COCO-SSD</span><span>V0.6</span></div>
   </div>
 
   <div class="cam-wrap">
@@ -225,26 +226,26 @@
 <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@4.10.0/dist/tf.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@tensorflow-models/coco-ssd@2.2.3/dist/coco-ssd.min.js"></script>
 <script>
-// Presenter pairing: if URL has ?session=XXXX, connect to that presenter
+// --- Firebase init ---
+const _firebaseConfig = {
+  apiKey: "AIzaSyAycSPxhFap2GJpWasOBveo_0ZvE8bWa24",
+  authDomain: "project-414d5.firebaseapp.com",
+  databaseURL: "https://project-414d5-default-rtdb.firebaseio.com",
+  projectId: "project-414d5",
+  storageBucket: "project-414d5.firebasestorage.app",
+  messagingSenderId: "579432495988",
+  appId: "1:579432495988:web:59cc6509629414ba0c4a21"
+};
+firebase.initializeApp(_firebaseConfig);
+
+// Presenter pairing: if URL has ?session=XXXX, set up the database reference
 const _sessionCode = new URLSearchParams(window.location.search).get('session');
-let _presenterConn = null;
+let _photosRef = null;
 
 if (_sessionCode) {
-  const tryConnect = () => {
-    if (typeof Peer === 'undefined') { setTimeout(tryConnect, 200); return; }
-    const peer = new Peer();
-    peer.on('open', () => {
-      _presenterConn = peer.connect('haskell-spot-' + _sessionCode.toLowerCase());
-      _presenterConn.on('open', () => {
-        document.getElementById('presentingPill').classList.add('on');
-      });
-      _presenterConn.on('close', () => {
-        document.getElementById('presentingPill').classList.remove('on');
-      });
-    });
-    peer.on('error', e => console.warn('peer', e));
-  };
-  tryConnect();
+  _photosRef = firebase.database().ref(`sessions/${_sessionCode.toUpperCase()}/photos`);
+  document.getElementById('presentingPill').classList.add('on');
+  console.log('[phone] connected to session', _sessionCode.toUpperCase());
 }
 
 const FINDABLE = ['bottle','cup','book','cell phone','laptop','keyboard','mouse',
@@ -524,14 +525,14 @@ $('retakeBtn').addEventListener('click', () => {
 
 $('keepBtn').addEventListener('click', () => {
   if (!lastDataUrl) return;
-  // Send to presenter if connected
-  if (_presenterConn && _presenterConn.open) {
-    _presenterConn.send({
-      type: 'photo',
+  // Push to Firebase (only if session code in URL)
+  if (_photosRef) {
+    _photosRef.push({
       dataUrl: lastDataUrl,
       prompt: lastPrompt,
       timestamp: Date.now()
-    });
+    }).then(() => console.log('[phone] photo pushed'))
+      .catch(e => console.error('[phone] push failed', e));
   }
   captures++;
   updateMeta();

@@ -239,30 +239,42 @@
 
   <div class="drop-overlay" id="dropOverlay">DROP TO ADD</div>
 
-<script src="https://unpkg.com/peerjs@1.5.4/dist/peerjs.min.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-database-compat.js"></script>
 <script>
 const $ = id => document.getElementById(id);
 
-// --- 1. Generate session code IMMEDIATELY (no waiting on anything) ---
+// --- Firebase config ---
+const firebaseConfig = {
+  apiKey: "AIzaSyAycSPxhFap2GJpWasOBveo_0ZvE8bWa24",
+  authDomain: "project-414d5.firebaseapp.com",
+  databaseURL: "https://project-414d5-default-rtdb.firebaseio.com",
+  projectId: "project-414d5",
+  storageBucket: "project-414d5.firebasestorage.app",
+  messagingSenderId: "579432495988",
+  appId: "1:579432495988:web:59cc6509629414ba0c4a21"
+};
+firebase.initializeApp(firebaseConfig);
+const db = firebase.database();
+
+// --- Generate session code IMMEDIATELY ---
 const sessionCode = Math.random().toString(36).substring(2, 6).toUpperCase();
-const peerId = 'haskell-spot-' + sessionCode.toLowerCase();
 
 $('sessionCode').textContent = sessionCode;
 $('pairingCode').textContent = sessionCode;
 
-// --- 2. Build phone URL and show QR code IMMEDIATELY ---
+// --- Build phone URL and show QR code ---
 const baseUrl = window.location.href.replace(/presenter\.html.*$/, 'index.html').split('?')[0];
 const phoneUrl = `${baseUrl}?session=${sessionCode}`;
 $('pairingUrl').textContent = phoneUrl;
 
-// URL-based QR generator — no library needed
 const qrSrc = `https://api.qrserver.com/v1/create-qr-code/?size=240x240&margin=2&color=1A1715&bgcolor=FFFFFF&data=${encodeURIComponent(phoneUrl)}`;
 $('qrimg').src = qrSrc;
 
-console.log('[presenter] session code:', sessionCode);
+console.log('[presenter] session:', sessionCode);
 console.log('[presenter] phone URL:', phoneUrl);
 
-// --- 3. Layout slots for the collage ---
+// --- Layout slots for the collage ---
 const SLOTS = [
   { x: 0.20, y: 0.32, rot: -7 },
   { x: 0.50, y: 0.26, rot: 4 },
@@ -319,41 +331,25 @@ function escapeHtml(s) {
   }[c]));
 }
 
-// --- 4. Now start PeerJS to listen for incoming photos ---
-try {
-  const peer = new Peer(peerId, { debug: 1 });
+// --- Listen for new photos pushed to this session's path ---
+const photosRef = db.ref(`sessions/${sessionCode}/photos`);
+$('connStatus').textContent = 'READY';
 
-  peer.on('open', (id) => {
-    console.log('[presenter] peer open, ready to receive at id:', id);
-    $('connStatus').textContent = 'READY';
-  });
+photosRef.on('child_added', (snap) => {
+  const data = snap.val();
+  if (data && data.dataUrl) {
+    console.log('[presenter] received photo');
+    if (!$('connStatus').classList.contains('live')) {
+      $('connStatus').textContent = 'LIVE';
+      $('connStatus').classList.add('live');
+    }
+    placePhoto(data);
+  }
+});
 
-  peer.on('connection', (conn) => {
-    console.log('[presenter] phone connected');
-    $('connStatus').textContent = 'CONNECTED';
-    $('connStatus').classList.add('live');
-    conn.on('data', (data) => {
-      console.log('[presenter] received', data && data.type);
-      if (data && data.type === 'photo' && data.dataUrl) {
-        placePhoto(data);
-      }
-    });
-    conn.on('close', () => {
-      $('connStatus').textContent = 'DISCONNECTED';
-      $('connStatus').classList.remove('live');
-    });
-  });
+photosRef.on('child_added' && undefined); // no-op safety
 
-  peer.on('error', (e) => {
-    console.warn('[presenter] peer error', e);
-    $('connStatus').textContent = 'OFFLINE — DRAG-DROP OK';
-  });
-} catch (e) {
-  console.error('[presenter] peer setup failed', e);
-  $('connStatus').textContent = 'OFFLINE — DRAG-DROP OK';
-}
-
-// --- 5. Demo + clear buttons + drag-drop ---
+// --- Demo + clear + drag-drop ---
 $('demoBtn').addEventListener('click', () => {
   const samplePrompts = [
     'The oldest thing in your fridge',
